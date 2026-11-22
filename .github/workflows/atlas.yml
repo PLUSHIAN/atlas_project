@@ -9,8 +9,8 @@ on:
       - '.github/workflows/atlas.yml'
   schedule:
     # UTC ímpar = Brasília par (18h, 20h, 22h, ...). Quatro tentativas por ciclo.
-    # Primeiro horário após a ativação: 18h37 de Brasília em 22/11/2026.
-    # Bootstrap automático via push funciona imediatamente ao publicar esta revisão.
+    # O evento push dispara imediatamente a primeira tentativa automática após a publicação.
+    # As rodadas regulares ocorrem de 2 em 2 horas (18h37, 20h37, 22h37...).
     # As três contingências são 5, 10 e 15 minutos após a principal.
     # Os checks no SQLite impedem 2 buscas válidas no mesmo ciclo.
     - cron: '37 1-23/2 * * *'
@@ -56,6 +56,7 @@ jobs:
       MAX_RETURN_CHECKS_PER_SCAN: '2'
       CACHE_HOURS: '1'
       DB_PATH: 'data/passagens.sqlite3'
+      ATLAS_RUN_REPORT: 'state/last-run.json'
       ATLAS_STATE_KEY: ${{ secrets.ATLAS_STATE_KEY }}
       # Gmail: valores não confidenciais definidos no workflow.
       # E-mail só é habilitado quando usuário e senha foram configurados em Secrets.
@@ -150,7 +151,7 @@ jobs:
       - name: Incorporar custos de deslocamento informados manualmente
         run: python -m backend.app.load_extras
 
-      - name: Pesquisar passagens a cada 2h (respeitar cota da fonte)
+      - name: Pesquisar passagens automaticamente (confirmar consumo real)
         id: scan
         continue-on-error: true
         shell: bash
