@@ -185,6 +185,80 @@ class Database:
                 item['last_checked'] = check['last_checked']
         return list(by_city.values())
 
+    def coverage_insights(self, plan):
+        """Cobertura por cidade e por data; somente consultas efetivas contam.
+
+        Cada route_key é um grupo de aeroportos, NÃO uma tarifa individual.
+        Valores indicativos não substituem itinerários completos validados.
+        """
+        effective = {'cotado', 'somente_indicativo', 'resultados_descartados',
+                     'sem_resultado', 'parcial'}
+        rows = self.query('SELECT route_key, status, checked_at FROM checks ORDER BY id')
+        last_attempt = {}
+        successful = set()
+        for row in rows:
+            last_attempt[row['route_key']] = row['checked_at']
+            if row['status'] in effective:
+                successful.add(row['route_key'])
+        previews = {r['route_key']: r for r in self.query(
+            'SELECT route_key, MIN(price_couple) minimum, COUNT(*) samples, '
+            'MAX(seen_at) last_seen FROM market_snapshots GROUP BY route_key')}
+        complete = {r['route_key']: r for r in self.query(
+            'SELECT route_key, MIN(price_couple) minimum, COUNT(*) samples, '
+            'MAX(seen_at) last_seen FROM observations GROUP BY route_key')}
+
+        cities = {}
+        for route in plan:
+            name = route.city
+            city = cities.setdefault(name, {
+                'city': name, 'total': 0, 'consulted': 0, 'attempted': 0,
+                'sample_size': 0, 'complete_samples': 0,
+                'min_indicative': None, 'min_complete': None,
+                'last_attempt': None, 'last_quote': None, 'dates': {},
+                'next_unsearched': []
+            })
+            departure = str(route.departure)
+            date_row = city['dates'].setdefault(departure, {
+                'departure': departure, 'total': 0, 'consulted': 0,
+                'min_indicative': None, 'min_complete': None
+            })
+            city['total'] += 1
+            date_row['total'] += 1
+            if route.key in last_attempt:
+                city['attempted'] += 1
+                if city['last_attempt'] is None or city['last_attempt'] < last_attempt[route.key]:
+                    city['last_attempt'] = last_attempt[route.key]
+            if route.key in successful:
+                city['consulted'] += 1
+                date_row['consulted'] += 1
+            elif len(city['next_unsearched']) < 3:
+                city['next_unsearched'].append({
+                    'departure': departure, 'return_departure': str(route.return_departure),
+                    'origins': list(route.origins)
+                })
+            for field, table in (('min_indicative', previews), ('min_complete', complete)):
+                item = table.get(route.key)
+                if item:
+                    val = item['minimum']
+                    if val is not None:
+                        for target in (city, date_row):
+                            existing = target[field]
+                            target[field] = val if existing is None else min(val, existing)
+                    if field == 'min_indicative':
+                        city['sample_size'] += item['samples']
+                    else:
+                        city['complete_samples'] += item['samples']
+                    if city['last_quote'] is None or city['last_quote'] < item['last_seen']:
+                        city['last_quote'] = item['last_seen']
+        for city in cities.values():
+            city['dates'] = list(city['dates'].values())
+            city['dates'].sort(key=lambda x: x['departure'])
+            city['dates_covered'] = sum(d['consulted'] > 0 for d in city['dates'])
+            city['dates_total'] = len(city['dates'])
+            city['pending'] = city['total'] - city['consulted']
+        return list(cities.values())
+
+
     def route_coverage(self, expected_keys):
         """Cobertura de combinações agrupadas: uma consulta não verifica cada aeroporto isoladamente."""
         expected = set(expected_keys)
