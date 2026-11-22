@@ -44,9 +44,20 @@ class Monitor:
             raise ValueError('Destino inválido ou multidestinos desativado')
         if destination is None:
             destination = self.sequence()[self.db.scan_count() % len(self.sequence())]
-        seen = self.db.route_last_sequences()
-        return min((r for r in plan if r.city == destination),
-                   key=lambda r: seen.get(r.key, 0))
+        options = [r for r in plan if r.city == destination]
+        attempts = self.db.route_last_sequences()
+        consulted = self.db.route_last_checks()
+        # Primeiro explorar quatro datas de saída, depois alternar grupos de
+        # aeroportos e retornos. Evita gastar todo o início da cota na mesma data.
+        untried = [r for r in options if r.key not in attempts]
+        if untried:
+            date_counts = Counter(r.departure for r in options if r.key in consulted)
+            origin_counts = Counter(r.origins for r in options if r.key in attempts)
+            return min(untried, key=lambda r: (
+                date_counts[r.departure], origin_counts[r.origins],
+                r.departure, r.return_departure, r.key))
+        # Depois da cobertura inicial, renovar primeiro as buscas mais antigas.
+        return min(options, key=lambda r: (attempts.get(r.key, 0), r.key))
 
     def status(self):
         checks = self.db.recent_checks(1)
