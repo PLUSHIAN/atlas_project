@@ -86,14 +86,14 @@ def test_manual_auto_still_obeys_cooldown(monkeypatch):
 
 
 def test_fallback_skips_when_slot_already_queried(monkeypatch):
-    now = datetime(2026, 11, 22, 22, 11, tzinfo=timezone.utc)  # 19h11 Brasília
+    now = datetime(2026, 11, 22, 22, 17, tzinfo=timezone.utc)  # 19h17 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status':'somente_indicativo','checked_at':datetime(2026,11,22,22,1,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
 
 
 def test_fallback_runs_when_primary_was_missed(monkeypatch):
-    now = datetime(2026, 11, 22, 22, 11, tzinfo=timezone.utc)  # 19h11 Brasília
+    now = datetime(2026, 11, 22, 22, 17, tzinfo=timezone.utc)  # 19h17 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status':'cotado','checked_at':datetime(2026,11,22,20,59,tzinfo=timezone.utc).isoformat()}])
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
@@ -101,9 +101,9 @@ def test_fallback_runs_when_primary_was_missed(monkeypatch):
 
 
 def test_scheduled_late_primary_is_not_duplicate(monkeypatch):
-    now = datetime(2026, 11, 22, 22, 5, tzinfo=timezone.utc)  # atraso de 28 minutos
+    now = datetime(2026, 11, 22, 23, 5, tzinfo=timezone.utc)  # atraso de 53 minutos
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'cotado','checked_at':datetime(2026,11,22,21,42,tzinfo=timezone.utc).isoformat()}])
+        {'status':'cotado','checked_at':datetime(2026,11,22,22,42,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
 
 
@@ -138,21 +138,21 @@ def test_push_initial_run_skips_if_same_slot_was_queried(monkeypatch):
     assert cloud_runner.main([]) == 0
 
 
-def test_cron_at_1847_does_not_confuse_manual_at_1701(monkeypatch):
-    """Regressão: cron 18h47 BRT é 21h47 UTC, com slot começando 21h UTC."""
-    now = datetime(2026, 11, 22, 21, 47, tzinfo=timezone.utc)
+def test_cron_at_1917_does_not_confuse_manual_at_1859(monkeypatch):
+    """Regressão: cron 19h17 BRT = 22h17 UTC, com slot começando 22h UTC."""
+    now = datetime(2026, 11, 22, 22, 17, tzinfo=timezone.utc)
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status': 'somente_indicativo',
-         'checked_at': datetime(2026, 11, 22, 20, 1, tzinfo=timezone.utc).isoformat()}])
+         'checked_at': datetime(2026, 11, 22, 21, 59, tzinfo=timezone.utc).isoformat()}])
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
     assert cloud_runner.should_scan_scheduled(now)[0] is True
 
 
-def test_cron_retry_skips_if_real_query_after_1837(monkeypatch):
-    now = datetime(2026, 11, 22, 21, 52, tzinfo=timezone.utc)
+def test_cron_retry_skips_if_real_query_after_1912(monkeypatch):
+    now = datetime(2026, 11, 22, 22, 27, tzinfo=timezone.utc)
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status': 'sem_resultado',
-         'checked_at': datetime(2026, 11, 22, 21, 47, tzinfo=timezone.utc).isoformat()}])
+         'checked_at': datetime(2026, 11, 22, 22, 12, tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
 
 
@@ -171,3 +171,16 @@ def test_report_distinguishes_run_and_search(monkeypatch, tmp_path):
     data = json.loads(output.read_text(encoding='utf-8'))
     assert data['searched'] is True
     assert data['destination'] == 'Madri'
+
+
+def test_19h12_bootstrap_and_three_retry_slots(monkeypatch):
+    """A trava vale por uma janela de 2h, não pelos minutos do cron."""
+    monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 20)
+    first = datetime(2026, 11, 22, 22, 9, tzinfo=timezone.utc)  # início via push
+    for minute in (12, 17, 22, 27):
+        now = datetime(2026, 11, 22, 22, minute, tzinfo=timezone.utc)
+        monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+            {'status':'cotado', 'checked_at':first.isoformat()}])
+        assert cloud_runner.should_scan_scheduled(now)[0] is False
+    next_cycle = datetime(2026, 11, 23, 0, 12, tzinfo=timezone.utc)  # 21h12 BRT
+    assert cloud_runner.should_scan_scheduled(next_cycle)[0] is True
