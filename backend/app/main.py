@@ -162,6 +162,12 @@ def rankings():
             'sample_size': len(entries), 'note': 'Rankings apenas de cotações históricas completas; não garantem compra. Nota heurística e gastos extras manuais.'}
 
 
+@app.get('/api/coverage-insights')
+def coverage_insights():
+    """Transparência sobre as datas e rotas efetivamente consultadas."""
+    return db.coverage_insights(monitor.plan())
+
+
 @app.get('/api/market-reference')
 def market_reference():
     return db.market_reference()
