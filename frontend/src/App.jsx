@@ -1,4 +1,5 @@
 import React, {useState,useEffect,useMemo} from 'react';
+import {googleFlightsSearchUrl, ORIGIN_AIRPORTS, DESTINATION_AIRPORTS} from './googleFlightsLinks.js';
 import {ResponsiveContainer,AreaChart,Area,XAxis,YAxis,CartesianGrid,Tooltip} from 'recharts';
 import {Plane,LayoutDashboard,History,Settings2,Sun,Moon,Search,RefreshCw,Mail,
   ArrowUpRight,ArrowDownRight,ChartNoAxesCombined,Clock3,CalendarDays,CheckCircle2,AlertTriangle,
@@ -31,7 +32,7 @@ export default function App(){
  const [formMessage,setFormMessage]=useState('');
  const [compareMode,setCompareMode]=useState('total');
  const [rankings,setRankings]=useState({international_cheapest:[],best_value:[],lowest_known_total:[],without_additional_costs:[],sample_size:0});
- const [marketReference,setMarketReference]=useState([]);const [diagnostics,setDiagnostics]=useState([]);const [coverageInsights,setCoverageInsights]=useState([]);const [showAllTracking,setShowAllTracking]=useState(false);const [lastExecution,setLastExecution]=useState(null);
+ const [marketReference,setMarketReference]=useState([]);const [diagnostics,setDiagnostics]=useState([]);const [coverageInsights,setCoverageInsights]=useState([]);const [showAllTracking,setShowAllTracking]=useState(false);const [lastExecution,setLastExecution]=useState(null);const [originAirportSelection,setOriginAirportSelection]=useState({'São Paulo':'GRU','Rio de Janeiro':'GIG'});const [destAirportSelection,setDestAirportSelection]=useState({'Milão':'MXP'});
  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('europa-theme',theme)},[theme]);
  const load=async()=>{try{
   let o,a,h,c,e,s,rankingData,referenceData,diagnosticData,coverageData;
@@ -188,12 +189,12 @@ export default function App(){
     {view==='history'&&<><section className="page-intro"><div><div className="section-kicker">REGISTRO TRANSPARENTE</div><h1>Histórico de pesquisas</h1><p>Todos os preços aqui são registros de consultas anteriores, não garantias de compra agora.</p></div></section><div className="dual-grid"><section className="panel chart-panel"><div className="panel-head"><h2>Evolução de preços</h2><Badge>Histórico</Badge></div>{chart.length?<div className="chart-holder"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chart}><CartesianGrid stroke="var(--chart-grid)" vertical={false}/><XAxis dataKey="date" tick={{fill:'var(--muted)'}}/><YAxis tickFormatter={v=>Math.round(v/1000)+'k'} tick={{fill:'var(--muted)'}}/><Tooltip formatter={v=>money(v)}/><Area dataKey="indicative" name="Prévia (sem volta verificada)" connectNulls stroke="#e2a66b" strokeDasharray="6 5" fill="none"/><Area dataKey="price" name="Volta validada" connectNulls stroke="#617dee" strokeWidth={2} fill="#617dee" fillOpacity={.12}/></AreaChart></ResponsiveContainer></div>:<Empty title="Sem histórico" description="Nenhuma pesquisa retornou uma cotação válida."/>}</section><section className="panel"><div className="panel-head"><h2>Últimas verificações</h2><Badge>{checks.length} registros recentes</Badge></div><div className="check-table">{checks.length?checks.map(c=><div className="check-row" key={c.id}><span className="check-time">{when(c.checked_at)}</span><div><strong>{c.route_key.split('|').slice(0,2).join(' → ')}</strong><small>{c.note}</small></div><Badge tone={c.status==='erro'?'red':c.status==='cotado'?'green':'neutral'}>{c.status}</Badge></div>):<Empty title="Nenhuma verificação" description="As pesquisas executadas aparecem aqui."/>}</div></section></div><section className="panel history-table"><div className="panel-head"><div><h2>Snapshots indicativos de mercado</h2><p className="muted">Preços da primeira etapa da SerpApi, sem retorno individual confirmado. Inclui tarifas acima do orçamento.</p></div><Badge>{snapshots.length} registros recentes</Badge></div><div className="table-scroll"><table><thead><tr><th>Consultado em</th><th>Rota</th><th>Ida</th><th>Volta prevista</th><th>Preço indicativo / casal</th><th>Validação</th><th>Conferir</th></tr></thead><tbody>{snapshots.length?snapshots.map(x=><tr key={x.id}><td>{when(x.seen_at)}</td><td>{x.origin} → {x.destination}</td><td>{day(x.departure)}</td><td>{day(x.return_departure)}</td><td><strong>{money(x.price_couple)}</strong></td><td>Volta ainda não validada</td><td><a href={x.search_url} target="_blank" rel="noreferrer">Google Flights</a></td></tr>):<tr><td colSpan="7" className="nothing">Sem prévias retornadas pela API ainda.</td></tr>}</tbody></table></div></section><section className="panel history-table"><div className="panel-head"><h2>Viagens completas validadas</h2><span className="muted">Cada linha é uma observação histórica da API</span></div><div className="table-scroll"><table><thead><tr><th>Consultado em</th><th>Rota</th><th>Saída</th><th>Retorno</th><th>Preço / casal</th><th>Origem dos dados</th></tr></thead><tbody>{history.length?history.map((h,i)=><tr key={i}><td>{when(h.seen_at)}</td><td>{h.origin} → {h.destination}</td><td>{day(h.departure)}</td><td>{day(h.return_departure)}</td><td><strong>{money(h.price_couple)}</strong></td><td>SerpApi / Google Flights</td></tr>):<tr><td colSpan="6" className="nothing">Sem cotações históricas ainda.</td></tr>}</tbody></table></div></section></>}
     {view==='google'&&<>
       <section className="page-intro"><div><div className="section-kicker">SEGUNDA FONTE GRATUITA</div><h1>Alertas oficiais do Google Flights</h1><p>Configure os acompanhamentos na sua conta Google. O Google envia avisos ao seu e-mail; o ATLAS não consulta nem automatiza o site.</p></div><Badge tone="blue">Sem créditos SerpApi</Badge></section>
-      <div className="notice info"><Info size={19}/><span>Esta página organiza as buscas. <strong>Os avisos oficiais NÃO são ativados automaticamente.</strong> Entre na sua conta Google e clique em “Acompanhar preços” para cada rota e data. O Google decide quando enviar notificações e não garante frequência.</span></div>
+      <div className="notice info"><Info size={19}/><span>Os botões de volta abrem uma pesquisa com aeroporto e datas já informados. <strong>Os avisos oficiais NÃO são ativados automaticamente.</strong> Entre na sua conta Google e clique em “Acompanhar preços” para cada rota e data. O Google decide quando enviar notificações e não garante frequência.</span></div>
       <section className="panel">
        <div className="panel-head"><div><div className="section-kicker">COMO ATIVAR</div><h2>Receba avisos diretamente no Gmail</h2></div><a className="outline" href={GOOGLE_FLIGHTS_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={16}/> Abrir Google Flights</a></div>
        <div className="google-instructions">
         <div><strong>1. Entre na sua conta Google</strong><small>Abra o Google Flights e selecione ida e volta, econômica, 2 adultos.</small></div>
-        <div><strong>2. Preencha a rota e as datas</strong><small>Comece por Barcelona e Madri, compare GRU/GIG e os demais aeroportos. A chegada ao Brasil precisa fechar 17 dias.</small></div>
+        <div><strong>2. Abra a busca pronta</strong><small>Escolha a origem no ATLAS e clique em uma das datas de volta. Confira no Google Flights os filtros aplicados e a chegada ao Brasil em 17 dias.</small></div>
         <div><strong>3. Ative “Acompanhar preços”</strong><small>Habilite o acompanhamento para as datas selecionadas. Você também pode testar “Qualquer data” como complemento.</small></div>
         <div><strong>4. Confira os avisos no Gmail</strong><small>O Google notifica mudanças relevantes; confirme tarifa final, taxas, bagagem e trecho Espanha–Itália antes de comprar.</small></div>
        </div>
@@ -202,13 +203,27 @@ export default function App(){
       </section>
       <section className="panel">
        <div className="panel-head"><div><div className="section-kicker">ROTEIRO PARA ATIVAR ALERTAS</div><h2>Rotas e datas para acompanhar</h2></div><Badge>{googleTasks.length} combinações sugeridas</Badge></div>
-       <p className="muted note">Primeiro aparecem as combinações com menos consultas registradas. O botão copiar prepara as informações, mas não ativa um alerta automaticamente. Cada origem representa um grupo de aeroportos.</p>
+       <p className="muted note">Primeiro aparecem as combinações com menos consultas registradas. Escolha o aeroporto e clique na data de volta desejada: o Google Flights abre com rota, datas e moeda na busca. Confira se o Google aplicou 2 adultos antes de ativar o alerta.</p>
        <div className="tracking-grid">{googleTasks.slice(0,showAllTracking?googleTasks.length:8).map(task=><div className="tracking-card" key={task.id}>
         <div className="tracking-head"><strong>{task.origin} → {task.city}</strong><Badge tone={task.checked?'green':'neutral'}>{task.checked?'Prévia no ATLAS':'Sem prévia no ATLAS'}</Badge></div>
-        <small>{task.airports}</small><span>Ida: <strong>{day(task.date)}</strong></span>
-        <span>Volta da Europa: <strong>{day(task.back1)}</strong> ou <strong>{day(task.back2)}</strong></span>
+        <div className="tracking-airport-selectors">
+         <label>Saindo de
+          <select value={originAirportSelection[task.origin]} onChange={e=>setOriginAirportSelection(prev=>({...prev,[task.origin]:e.target.value}))}>
+           {ORIGIN_AIRPORTS[task.origin].map(code=><option value={code} key={code}>{code}</option>)}
+          </select>
+         </label>
+         <label>Chegando em
+          <select value={destAirportSelection[task.city]||DESTINATION_AIRPORTS[task.city][0]} onChange={e=>setDestAirportSelection(prev=>({...prev,[task.city]:e.target.value}))}>
+           {DESTINATION_AIRPORTS[task.city].map(code=><option value={code} key={code}>{code}</option>)}
+          </select>
+         </label>
+        </div>
+        <span>Ida: <strong>{day(task.date)}</strong> · 2 adultos · econômica · BRL</span>
         <small>Menor prévia da data pesquisada pelo ATLAS: {money(task.minIndicative)}</small>
-        <div className="tracking-actions"><button className="outline" onClick={()=>copyGoogleTask(task)}>Copiar parâmetros</button><a className="outline" href={GOOGLE_FLIGHTS_URL} target="_blank" rel="noopener noreferrer">Abrir busca <ExternalLink size={14}/></a></div>
+        <div className="tracking-actions">
+         <a className="outline" href={googleFlightsSearchUrl({originCity:task.origin,originAirport:originAirportSelection[task.origin],destinationCity:task.city,destinationAirport:destAirportSelection[task.city]||DESTINATION_AIRPORTS[task.city][0],departure:task.date,returnDate:task.back1})} target="_blank" rel="noopener noreferrer">Volta {day(task.back1)} <ExternalLink size={14}/></a>
+         <a className="outline" href={googleFlightsSearchUrl({originCity:task.origin,originAirport:originAirportSelection[task.origin],destinationCity:task.city,destinationAirport:destAirportSelection[task.city]||DESTINATION_AIRPORTS[task.city][0],departure:task.date,returnDate:task.back2})} target="_blank" rel="noopener noreferrer">Volta {day(task.back2)} <ExternalLink size={14}/></a>
+        </div>
        </div>)}</div>
        <button className="outline" style={{marginTop:16}} onClick={()=>setShowAllTracking(v=>!v)}>{showAllTracking?'Mostrar apenas 8':'Ver todas as 32 sugestões'}</button>
       </section>
