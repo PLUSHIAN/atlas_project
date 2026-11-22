@@ -2,8 +2,9 @@ name: ATLAS - Passagens Europa
 
 on:
   schedule:
-    # UTC; executa a cada 2 horas, minuto 41 (evita horários de pico e reativa agenda)
-    - cron: '41 */2 * * *'
+    # Horário de Brasília (UTC-3): 00h, 02h, 04h, ..., 18h, 20h, 22h.
+    # Em UTC, isso corresponde a todas as horas ímpares, no minuto zero.
+    - cron: '0 1-23/2 * * *'
   workflow_dispatch:
     inputs:
       destination:
@@ -64,7 +65,7 @@ jobs:
         run: |
           echo "Evento: ${GITHUB_EVENT_NAME}"
           echo "Branch: ${GITHUB_REF_NAME}"
-          echo "Agendamento UTC: minuto 41 a cada 2 horas"
+          echo "Agendamento UTC: horas ímpares, minuto zero (horas pares em Brasília)"
 
       - name: Configurar Python
         uses: actions/setup-python@v6
