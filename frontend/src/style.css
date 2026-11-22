@@ -46,3 +46,23 @@
 .rank-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .rank-tab{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:9px;padding:8px 12px;font:inherit;font-size:.8rem;cursor:pointer}
 .rank-tab.active{border-color:#647deb;background:rgba(100,125,235,.13);color:var(--text)}
+
+/* Cobertura por cidade e guia de alertas oficiais */
+.insight-grid,.tracking-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}
+.insight-card,.tracking-card{display:flex;flex-direction:column;gap:10px;padding:19px;border:1px solid var(--edge);border-radius:14px;background:var(--surface);min-width:0}
+.insight-card-head,.tracking-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.insight-card-head strong,.tracking-head strong{font-size:16px;color:var(--text)}
+.insight-price{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.insight-price span,.tracking-card small{font-size:12px;color:var(--muted)}
+.insight-price strong{color:var(--text);font-size:17px;white-space:nowrap}
+.date-coverage{display:flex;flex-direction:column;gap:6px;margin-top:4px;padding-top:12px;border-top:1px solid var(--edge)}
+.date-coverage-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px}
+.date-coverage-row span{color:var(--muted)}.date-coverage-row strong{font-size:12px}
+.google-instructions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:18px 0}
+.google-instructions>div{display:flex;flex-direction:column;gap:6px;padding:16px;background:var(--surface);border:1px solid var(--edge);border-radius:12px}
+.google-instructions small{font-size:12px;line-height:1.5;color:var(--muted)}
+.tracking-card>span{font-size:12px;color:var(--muted)}.tracking-card>span strong{color:var(--text)}
+.tracking-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+.tracking-actions .outline{flex:1;padding:9px 11px;white-space:nowrap;justify-content:center}
+@media(max-width:840px){.insight-grid,.tracking-grid,.google-instructions{grid-template-columns:1fr}}
+@media(min-width:1400px){.insight-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
