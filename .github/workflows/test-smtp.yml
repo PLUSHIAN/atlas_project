@@ -1,0 +1,49 @@
+name: ATLAS - Testar e-mail SMTP
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smtp-test:
+    name: Enviar e-mail de teste (sem SerpApi)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MAIL_ENABLED: 'true'
+      SMTP_HOST: 'smtp.gmail.com'
+      SMTP_PORT: '587'
+      SMTP_SSL: 'false'
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM || secrets.SMTP_USER }}
+      ALERT_TO: ${{ secrets.ALERT_TO || secrets.SMTP_USER }}
+    steps:
+      - name: Baixar somente o código
+        uses: actions/checkout@v6
+
+      - name: Preparar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validar Secrets SMTP obrigatórios
+        shell: bash
+        run: |
+          if [ -z "$SMTP_USER" ] || [ -z "$SMTP_PASSWORD" ]; then
+            echo "::error::Configure os Secrets SMTP_USER e SMTP_PASSWORD em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ -z "$SMTP_FROM" ] || [ -z "$ALERT_TO" ]; then
+            echo "::error::Configure SMTP_FROM e ALERT_TO, ou deixe o fallback do usuário."
+            exit 1
+          fi
+          echo "Configuração SMTP presente. Nenhuma credencial será exibida."
+
+      - name: Instalar a única dependência necessária
+        run: python -m pip install 'python-dotenv>=1,<2'
+
+      - name: Enviar teste SMTP
+        run: python -m backend.app.check_smtp
