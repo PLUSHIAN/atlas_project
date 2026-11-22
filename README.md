@@ -55,3 +55,14 @@ Nunca envie `.env`, bancos locais, `.venv` ou senhas ao GitHub. A chave publicad
 ## Black Friday 2026: cadência reforçada
 
 O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HOURS=1`, priorizando Espanha. Não há mais janela obrigatória de 8 horas. O agendamento GitHub `17 */2 * * *` é em UTC e pode atrasar ou eventualmente falhar; o monitor não garante execução no minuto exato. O robô para de consultar quando a conta não tiver créditos gratuitos ou o teto local for atingido, sem gerar cobranças. Como cada rodada pode consumir duas ou três consultas, 12 rodadas diárias podem consumir até aproximadamente 24 a 36 créditos/dia.
+
+
+## Google Flights: alertas gratuitos oficiais
+
+O ATLAS agora mostra **cobertura por destino e data**, separa tarifas indicativas de viagens completas e distribui a fila para explorar as quatro datas antes de repetir a mesma saída. A aba **Alertas Google** apresenta um roteiro de rotas e datas para configurar na interface oficial.
+
+**Importante:** o ATLAS **não ativa automaticamente** os acompanhamentos de preços do Google. Para receber os avisos oficiais, abra https://www.google.com/travel/flights?hl=pt-BR com sua conta Google, escolha origem, destino, datas, 2 adultos, econômica e ative **Acompanhar preços**. Repita para as rotas que desejar. O Google envia os avisos diretamente para o Gmail vinculado à conta; o ATLAS não recebe nem importa esses avisos automaticamente. O Google controla quando avisa, sem prazo fixo. Não usamos scraping ou APIs não oficiais do Google Flights.
+
+Para começar com melhor cobertura, habilite Barcelona e Madri com GRU e GIG para idas em 08, 09, 10 e 11/09/2027 e retornos que permitam **chegar ao Brasil no 17º dia**. Depois acrescente Roma, Milão e VCP/CGH/SDU. As datas de saída da Europa podem ser D+15 ou D+16, dependendo do voo e da conexão.
+
+Os e-mails **do ATLAS** continuam independentes e são disparados por cotações completas verificadas via SerpApi até R$ 8.000 para o casal.
