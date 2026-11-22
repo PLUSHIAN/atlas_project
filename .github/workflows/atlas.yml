@@ -9,7 +9,8 @@ on:
       - '.github/workflows/atlas.yml'
   schedule:
     # UTC ímpar = Brasília par (18h, 20h, 22h, ...). Quatro tentativas por ciclo.
-    # Primeiro horário após a ativação de 22/11/2026: 18h37 de Brasília.
+    # Primeiro horário após a ativação: 18h37 de Brasília em 22/11/2026.
+    # Bootstrap automático via push funciona imediatamente ao publicar esta revisão.
     # As três contingências são 5, 10 e 15 minutos após a principal.
     # Os checks no SQLite impedem 2 buscas válidas no mesmo ciclo.
     - cron: '37 1-23/2 * * *'
