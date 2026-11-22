@@ -54,10 +54,10 @@ jobs:
       ALERT_TO: ${{ secrets.ALERT_TO }}
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configurar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
@@ -88,7 +88,7 @@ jobs:
 
       - name: Recuperar SQLite e histórico de alertas
         if: steps.state.outputs.run_id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: atlas-state-encrypted
           run-id: ${{ steps.state.outputs.run_id }}
@@ -139,7 +139,7 @@ jobs:
 
       - name: Salvar somente SQLite criptografado
         if: always() && env.ATLAS_STATE_KEY != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: atlas-state-encrypted
           path: state/atlas-state.enc
@@ -148,7 +148,7 @@ jobs:
           compression-level: 6
 
       - name: Preparar Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -162,7 +162,7 @@ jobs:
           npm run build
 
       - name: Disponibilizar painel como artefato privado
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: atlas-dashboard
           path: frontend/dist/
