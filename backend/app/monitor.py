@@ -55,7 +55,7 @@ class Monitor:
             origin_counts = Counter(r.origins for r in options if r.key in attempts)
             return min(untried, key=lambda r: (
                 date_counts[r.departure], origin_counts[r.origins],
-                r.departure, r.return_departure, r.key))
+                r.departure, r.return_departure))
         # Depois da cobertura inicial, renovar primeiro as buscas mais antigas.
         return min(options, key=lambda r: (attempts.get(r.key, 0), r.key))
 
