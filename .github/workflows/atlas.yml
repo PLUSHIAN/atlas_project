@@ -44,14 +44,18 @@ jobs:
       CACHE_HOURS: '12'
       DB_PATH: 'data/passagens.sqlite3'
       ATLAS_STATE_KEY: ${{ secrets.ATLAS_STATE_KEY }}
-      MAIL_ENABLED: ${{ secrets.MAIL_ENABLED }}
-      SMTP_HOST: ${{ secrets.SMTP_HOST }}
-      SMTP_PORT: ${{ secrets.SMTP_PORT }}
-      SMTP_SSL: ${{ secrets.SMTP_SSL }}
+      # Gmail: valores não confidenciais definidos no workflow.
+      # E-mail só é habilitado quando usuário e senha foram configurados em Secrets.
+      MAIL_ENABLED: ${{ secrets.SMTP_USER != '' && secrets.SMTP_PASSWORD != '' }}
+      SMTP_HOST: 'smtp.gmail.com'
+      SMTP_PORT: '587'
+      SMTP_SSL: 'false'
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      SMTP_FROM: ${{ secrets.SMTP_FROM }}
-      ALERT_TO: ${{ secrets.ALERT_TO }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM || secrets.SMTP_USER }}
+      ALERT_TO: ${{ secrets.ALERT_TO || secrets.SMTP_USER }}
+      ALERT_MIN_DROP_PCT: '5'
+      ALERT_MIN_DROP_BRL: '200'
     steps:
       - name: Baixar código
         uses: actions/checkout@v6
