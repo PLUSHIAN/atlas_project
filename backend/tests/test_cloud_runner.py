@@ -95,15 +95,15 @@ def test_fallback_skips_when_slot_already_queried(monkeypatch):
 def test_fallback_runs_when_primary_was_missed(monkeypatch):
     now = datetime(2026, 11, 22, 22, 11, tzinfo=timezone.utc)  # 19h11 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'cotado','checked_at':datetime(2026,11,22,21,59,tzinfo=timezone.utc).isoformat()}])
+        {'status':'cotado','checked_at':datetime(2026,11,22,20,59,tzinfo=timezone.utc).isoformat()}])
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
     assert cloud_runner.should_scan_scheduled(now)[0] is True
 
 
 def test_scheduled_late_primary_is_not_duplicate(monkeypatch):
-    now = datetime(2026, 11, 22, 23, 5, tzinfo=timezone.utc)  # atraso de 65 minutos
+    now = datetime(2026, 11, 22, 22, 5, tzinfo=timezone.utc)  # atraso de 28 minutos
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'cotado','checked_at':datetime(2026,11,22,22,12,tzinfo=timezone.utc).isoformat()}])
+        {'status':'cotado','checked_at':datetime(2026,11,22,21,42,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
 
 
@@ -136,3 +136,38 @@ def test_push_initial_run_skips_if_same_slot_was_queried(monkeypatch):
     monkeypatch.setattr(cloud_runner.monitor, 'scan_once', lambda destination=None: (
         _ for _ in ()).throw(AssertionError('não pode duplicar pesquisa')))
     assert cloud_runner.main([]) == 0
+
+
+def test_cron_at_1847_does_not_confuse_manual_at_1701(monkeypatch):
+    """Regressão: cron 18h47 BRT é 21h47 UTC, com slot começando 21h UTC."""
+    now = datetime(2026, 11, 22, 21, 47, tzinfo=timezone.utc)
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status': 'somente_indicativo',
+         'checked_at': datetime(2026, 11, 22, 20, 1, tzinfo=timezone.utc).isoformat()}])
+    monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
+    assert cloud_runner.should_scan_scheduled(now)[0] is True
+
+
+def test_cron_retry_skips_if_real_query_after_1837(monkeypatch):
+    now = datetime(2026, 11, 22, 21, 52, tzinfo=timezone.utc)
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status': 'sem_resultado',
+         'checked_at': datetime(2026, 11, 22, 21, 47, tzinfo=timezone.utc).isoformat()}])
+    assert cloud_runner.should_scan_scheduled(now)[0] is False
+
+
+def test_report_distinguishes_run_and_search(monkeypatch, tmp_path):
+    import json
+    output = tmp_path / 'report.json'
+    monkeypatch.setenv('ATLAS_RUN_REPORT', str(output))
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'schedule')
+    monkeypatch.setenv('GITHUB_RUN_ID', '123456')
+    cloud_runner.write_run_report({'status':'aguardando_cota', 'message':'Janela já pesquisada'}, searched=False)
+    data = json.loads(output.read_text(encoding='utf-8'))
+    assert data['event'] == 'schedule'
+    assert data['run_id'] == '123456'
+    assert data['searched'] is False
+    cloud_runner.write_run_report({'status':'somente_indicativo','destination':'Madri'}, searched=True)
+    data = json.loads(output.read_text(encoding='utf-8'))
+    assert data['searched'] is True
+    assert data['destination'] == 'Madri'
