@@ -2,8 +2,8 @@ name: ATLAS - Passagens Europa
 
 on:
   schedule:
-    # UTC; executa a cada 2 horas, minuto 17 (evita horários de pico)
-    - cron: '17 */2 * * *'
+    # UTC; executa a cada 2 horas, minuto 41 (evita horários de pico e reativa agenda)
+    - cron: '41 */2 * * *'
   workflow_dispatch:
     inputs:
       destination:
@@ -59,6 +59,12 @@ jobs:
     steps:
       - name: Baixar código
         uses: actions/checkout@v6
+
+      - name: Registrar origem da execução
+        run: |
+          echo "Evento: ${GITHUB_EVENT_NAME}"
+          echo "Branch: ${GITHUB_REF_NAME}"
+          echo "Agendamento UTC: minuto 41 a cada 2 horas"
 
       - name: Configurar Python
         uses: actions/setup-python@v6
