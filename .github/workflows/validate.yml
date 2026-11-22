@@ -1,0 +1,59 @@
+name: ATLAS - Validar Código
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/validate.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Testes offline e compilação React
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      MONITOR_ENABLED: 'false'
+      SERPAPI_KEY: ''
+      MAIL_ENABLED: 'false'
+      DB_PATH: 'data/ci.sqlite3'
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v6
+
+      - name: Configurar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependências
+        run: python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Testes Python sem consultas nem e-mail
+        run: python -m pytest backend/tests -q
+
+      - name: Preparar Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Compilar frontend React
+        working-directory: frontend
+        env:
+          GITHUB_PAGES: 'true'
+          VITE_STATIC_MODE: 'true'
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
