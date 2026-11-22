@@ -14,7 +14,7 @@ Depois acesse **Settings > General > Danger Zone > Change repository visibility 
 
 ## GitHub Actions (agendamento e armazenamento)
 
-- `.github/workflows/atlas.yml` é acionado a cada 2 horas (horas pares no Brasil, minuto 00; retentativa no minuto 11), com tentativa de pesquisa a cada execução (intervalo mínimo de 2h).
+- `.github/workflows/atlas.yml` é acionado a cada 2 horas (horas ímpares no Brasil: 19h/21h/23h/01h etc., minuto 00; retentativa no minuto 11), com tentativa de pesquisa a cada execução (intervalo mínimo de 2h).
 - O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
 - O histórico SQLite é restaurado e salvo como artefato criptografado `atlas-state-encrypted` por até 30 dias. `ATLAS_STATE_KEY` é obrigatório; mantenha uma cópia segura da chave e faça backups periódicos.
 - O React é compilado em modo estático e entregue como artefato `atlas-dashboard`. Quando o repositório for público e Pages estiver ativado, também será publicado como website.
