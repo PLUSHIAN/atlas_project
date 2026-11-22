@@ -36,7 +36,16 @@ def create_snapshot():
     recent = api.db.recent_checks(1)
     if recent and recent[0]['status'] == 'erro':
         monitor['last_error'] = recent[0]['note']
+    # Diferencia execução do GitHub de consulta real à SerpApi.
+    last_execution = None
+    report = os.getenv('ATLAS_RUN_REPORT', '').strip()
+    if report and Path(report).is_file():
+        try:
+            last_execution = json.loads(Path(report).read_text(encoding='utf-8'))
+        except (ValueError, OSError):
+            last_execution = None
     return public_only({
+        'last_execution': last_execution,
         'exported_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'overview': overview,
         'offers': api.offers(origin='',destination='',departure='',max_price=0),
