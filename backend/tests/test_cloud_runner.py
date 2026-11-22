@@ -56,3 +56,29 @@ def test_can_use_up_to_250_credits_but_wont_exceed(monkeypatch):
     assert cloud_runner.should_scan(now)[0]
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 249)
     assert not cloud_runner.should_scan(now)[0]
+
+
+def test_scheduled_trigger_queries_even_after_manual(monkeypatch):
+    """A execução schedule não deve pular a busca só por consulta manual recente."""
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'schedule')
+    monkeypatch.setattr(cloud_runner.settings, 'serpapi_key', 'chave-falsa-do-teste')
+    def blocked_if_called(*args, **kwargs):
+        raise AssertionError('should_scan não deve bloquear schedule')
+    monkeypatch.setattr(cloud_runner, 'should_scan', blocked_if_called)
+    calls = []
+    def fake_scan(destination=None):
+        calls.append(destination)
+        return {'status': 'sem_resultado', 'offers': 0}
+    monkeypatch.setattr(cloud_runner.monitor, 'scan_once', fake_scan)
+    assert cloud_runner.main([]) == 0
+    assert calls == [None]
+
+
+def test_manual_auto_still_obeys_cooldown(monkeypatch):
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'workflow_dispatch')
+    monkeypatch.setattr(cloud_runner.settings, 'serpapi_key', 'chave-falsa-do-teste')
+    monkeypatch.setattr(cloud_runner, 'should_scan', lambda: (False, 'Consulta manual recente'))
+    def unexpected_scan(destination=None):
+        raise AssertionError('Não deveria consultar dentro da janela manual')
+    monkeypatch.setattr(cloud_runner.monitor, 'scan_once', unexpected_scan)
+    assert cloud_runner.main([]) == 0
