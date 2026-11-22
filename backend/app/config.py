@@ -11,6 +11,11 @@ def bool_env(name: str, default=False) -> bool:
     return os.getenv(name, str(default)).strip().lower() in ('1','true','yes','sim')
 
 
+def int_env(name: str, default: int) -> int:
+    value = os.getenv(name, '').strip()
+    return int(value) if value else default
+
+
 @dataclass
 class Settings:
     db_path: str = os.getenv('DB_PATH', str(ROOT / 'data' / 'passagens.sqlite3'))
@@ -24,7 +29,7 @@ class Settings:
     max_return_checks_per_scan: int = min(2,max(1,int(os.getenv('MAX_RETURN_CHECKS_PER_SCAN','2'))))
     app_api_token: str = os.getenv('APP_API_TOKEN', '').strip()
     smtp_host: str = os.getenv('SMTP_HOST', '').strip()
-    smtp_port: int = int(os.getenv('SMTP_PORT', '587'))
+    smtp_port: int = int_env('SMTP_PORT', 587)
     smtp_user: str = os.getenv('SMTP_USER', '').strip()
     smtp_password: str = os.getenv('SMTP_PASSWORD', '').strip()
     smtp_from: str = os.getenv('SMTP_FROM', '').strip()
