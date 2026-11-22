@@ -14,7 +14,7 @@ Depois acesse **Settings > General > Danger Zone > Change repository visibility 
 
 ## GitHub Actions (agendamento e armazenamento)
 
-- `.github/workflows/atlas.yml` é acionado a cada 2 horas (horas ímpares no Brasil: 19h/21h/23h/01h etc., minuto 00; retentativa no minuto 11), com tentativa de pesquisa a cada execução (intervalo mínimo de 2h).
+- `.github/workflows/atlas.yml` é acionado a cada 2 horas (horas pares no Brasil: 18h37, 20h37, 22h37 etc., retentativas aos minutos 42, 47 e 52), com tentativa de pesquisa a cada execução (intervalo mínimo de 2h).
 - O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
 - O histórico SQLite é restaurado e salvo como artefato criptografado `atlas-state-encrypted` por até 30 dias. `ATLAS_STATE_KEY` é obrigatório; mantenha uma cópia segura da chave e faça backups periódicos.
 - O React é compilado em modo estático e entregue como artefato `atlas-dashboard`. Quando o repositório for público e Pages estiver ativado, também será publicado como website.
@@ -66,3 +66,12 @@ O ATLAS agora mostra **cobertura por destino e data**, separa tarifas indicativa
 Para começar com melhor cobertura, habilite Barcelona e Madri com GRU e GIG para idas em 08, 09, 10 e 11/09/2027 e retornos que permitam **chegar ao Brasil no 17º dia**. Depois acrescente Roma, Milão e VCP/CGH/SDU. As datas de saída da Europa podem ser D+15 ou D+16, dependendo do voo e da conexão.
 
 Os e-mails **do ATLAS** continuam independentes e são disparados por cotações completas verificadas via SerpApi até R$ 8.000 para o casal.
+
+
+## Execuções automáticas e contingências (novembro 2026)
+
+- A primeira implantação deste agendamento executa automaticamente pelo evento `push` quando `.github/workflows/atlas.yml` é atualizado na `main`. O evento é **push**, não **schedule**; para validar a agenda espere aparecer uma execução `Scheduled`.
+- O cron principal roda às 18h37, 20h37, 22h37, 00h37 etc. (horário de Brasília) e existem **três tentativas extras** aos minutos 42, 47 e 52 de cada janela, todas gratuitas no GitHub Actions para repositórios públicos conforme as condições do serviço.
+- O histórico SQLite impede repetir uma pesquisa **concluída** no mesmo ciclo. Os retries só consultam a fonte se não houver consulta efetiva gravada no ciclo; o custo em créditos SerpApi pode aumentar se as buscas falharem repetidamente.
+- GitHub Actions pode atrasar ou descartar **todas** as tentativas; não existe SLA ou garantia de início pontual. Para identificar a origem no log, procure `Evento: push` (automático por commit), `Evento: schedule` (automático por cron) ou `Evento: workflow_dispatch` (manual).
+- Para verificar: https://github.com/PLUSHIAN/atlas_project/actions/workflows/atlas.yml . Pesquisas e e-mails dependem dos Secrets e da cota disponível.
