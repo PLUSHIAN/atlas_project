@@ -1,29 +1,42 @@
 # ATLAS — Passagens Europa 2027
 
-Monitor de passagens para dois adultos (Brasil → Europa), priorizando Barcelona e Madri sem ignorar Roma, Milão ou rotas multidestinos.
+Monitor pessoal de passagens para dois adultos com prioridade para Barcelona e Madri, incluindo Roma, Milão e multidestinos.
 
-## Status da publicação
+## GitHub Actions (repositório privado)
 
-O arquivo [GitHub Actions](.github/workflows/atlas.yml) já está configurado com agendamento `17 */2 * * *` (UTC), equivalente a uma tentativa de execução a cada duas horas. **O código do backend e do frontend ainda precisa ser adicionado neste repositório antes da primeira execução bem-sucedida.** O workflow isolado não executa o bot.
+- `.github/workflows/atlas.yml` é acionado a cada 2 horas (UTC, minuto 17), mas só pesquisa quando a janela de economia permite (8h por padrão).
+- O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
+- O histórico SQLite é restaurado e salvo via artifact privado `atlas-state` por 30 dias. Sem estado anterior, cria banco novo; baixe backups periodicamente.
+- O frontend React é compilado a cada execução e disponibilizado como artifact privado `atlas-dashboard` (arquivos estáticos), sem site público neste repositório.
+- Para site com URL pública usando GitHub Pages no plano gratuito, o repositório deve ser público. **Não alteramos a visibilidade sem sua autorização**.
 
-## Instalação do código do ATLAS
+## Configurar a primeira execução
 
-Baixe o pacote completo v5.1 disponibilizado na conversa ChatGPT e extraia-o no Windows. Dentro da pasta `europa-passagens-gratis`, execute:
+Em `Settings > Secrets and variables > Actions`, crie `SERPAPI_KEY` (obrigatório para consultas). Para alertas, crie `MAIL_ENABLED=true`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SSL`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `ALERT_TO`. Não adicione segredos ao código.
+
+Em `Actions > ATLAS - Passagens Europa > Run workflow`, selecione `auto`. O resultado e o banco privado ficam nos artefatos da execução. Para visualizar o painel localmente, use as instruções abaixo.
+
+**Custo:** execuções em repositórios privados consomem a franquia GitHub Actions do seu plano. O bot limita pesquisas SerpApi para reduzir o consumo, mas o agendamento pode atrasar e o GitHub não garante custo zero após exceder a franquia.
+
+## VS Code no Windows
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\PUBLICAR_NO_GITHUB.ps1
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
-O script clona este repositório, copia os arquivos do projeto com exclusão de segredos, apresenta a lista de alterações e **pede a confirmação `PUBLICAR`** antes de fazer commit e push.
+Novo terminal:
 
-## Ativar pesquisas reais
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-Em **Settings > Secrets and variables > Actions**, crie `SERPAPI_KEY` com uma chave ativa de sua conta. **Nunca publique o arquivo `.env`.** Para os alertas, crie `MAIL_ENABLED=true`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SSL`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` e `ALERT_TO` (senha de aplicativo SMTP, se aplicável). Depois vá a **Actions > ATLAS - Passagens Europa > Run workflow**.
+Painel local: `http://127.0.0.1:5173`. A versão para GitHub gera arquivos em `frontend/dist`, baixáveis na execução Actions. Para visualizar com dados atualizados, use o artifact `atlas-dashboard`.
 
-Cada evento automático ocorre a cada 2h, mas buscas reais são limitadas pelo intervalo de economia (padrão 8h) e pela cota gratuita da SerpApi. O SQLite e o build React são guardados como artefatos privados por 30 dias; baixe backups periodicamente.
+Execute testes locais: `python -m pip install -r backend/requirements-dev.txt; python -m pytest backend/tests -q`.
 
-## Dashboard
-
-Este repositório está **privado**. GitHub Pages gratuito exige repositório público; não mudamos a visibilidade sem consentimento. A compilação React será guardada no artefato privado `atlas-dashboard`, não hospedada como website. O FastAPI não fica ligado 24h no GitHub Actions.
-
-O GitHub Actions usa minutos de execução e armazenamento; verifique a franquia gratuita de sua conta.
+Nunca envie `.env`, bancos locais, `.venv` ou senhas ao GitHub. A chave publicada previamente em chat deve ter sido substituída.
