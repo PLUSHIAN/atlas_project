@@ -184,3 +184,44 @@ def test_open_jaw_scan_persists_complete_itinerary_without_alert_above_limit(tmp
     assert offer['journey_type']=='open_jaw'
     assert db.scan_diagnostics()[0]['metrics']['complete_itineraries']==1
     assert db.recent_snapshots()[0]['status']=='indicativo_sem_volta_validada'
+
+
+def test_coverage_insights_by_city_and_departure(tmp_path):
+    from app.trip import routes
+    db = Database(str(tmp_path/'city-coverage.sqlite3'))
+    plan = routes()
+    selected = next(r for r in plan if r.city == 'Barcelona' and str(r.departure) == '2027-09-08')
+    db.record_check(selected.key, 'somente_indicativo', 'amostra de teste', 1)
+    db.add_snapshots([{
+        'seen_at': '2026-11-22T21:30:00+00:00',
+        'route_key': selected.key, 'origin': 'GRU', 'destination': 'BCN',
+        'departure': '2027-09-08', 'return_departure': '2027-09-23',
+        'price_couple': 12345.0, 'outbound_key': 'apenas-teste',
+        'source': 'TESTE_OFFLINE', 'status': 'indicativo_sem_volta_validada'
+    }])
+    cities = {x['city']: x for x in db.coverage_insights(plan)}
+    barcelona = cities['Barcelona']
+    assert barcelona['total'] == 16
+    assert barcelona['consulted'] == 1
+    assert barcelona['dates_covered'] == 1
+    assert barcelona['dates_total'] == 4
+    assert barcelona['min_indicative'] == 12345
+    assert barcelona['min_complete'] is None
+    assert barcelona['sample_size'] == 1
+    assert any(d['departure'] == '2027-09-08' and d['consulted'] == 1 for d in barcelona['dates'])
+    assert all(x['min_indicative'] is None for x in cities['Madri']['dates'])
+    assert cities['Roma']['consulted'] == 0
+
+
+def test_destination_search_explores_all_departure_dates_before_repeating(tmp_path):
+    from app.trip import routes
+    db = Database(str(tmp_path/'rotation.sqlite3'))
+    cfg = replace(Settings(),serpapi_key='TEST_ONLY',spain_priority=True,open_jaw_enabled=False)
+    mon = Monitor(db,cfg,NoOffersProvider())
+    searched = []
+    for _ in range(4):
+        route = mon.pick_route('Barcelona')
+        searched.append(str(route.departure))
+        db.record_check(route.key,'sem_resultado','teste local',1,city='Barcelona')
+    assert searched == ['2027-09-08','2027-09-09','2027-09-10','2027-09-11']
+    assert len(set(searched)) == 4
