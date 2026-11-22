@@ -1,0 +1,133 @@
+name: ATLAS - Passagens Europa
+
+on:
+  schedule:
+    - cron: '17 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: 'Destino desta execução'
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - Barcelona
+          - Madri
+          - Roma
+          - Milão
+          - 'Roma → Milão'
+          - 'Milão → Roma'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: atlas-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+      MONITOR_ENABLED: 'false'
+      OPEN_JAW_ENABLED: 'true'
+      SPAIN_PRIORITY: 'true'
+      SCAN_INTERVAL_HOURS: '2'
+      CLOUD_MIN_SCAN_HOURS: '8'
+      MAX_REQUESTS_30D: '210'
+      MAX_RETURN_CHECKS_PER_SCAN: '2'
+      CACHE_HOURS: '12'
+      DB_PATH: 'data/passagens.sqlite3'
+      MAIL_ENABLED: ${{ secrets.MAIL_ENABLED }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_SSL: ${{ secrets.SMTP_SSL }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      ALERT_TO: ${{ secrets.ALERT_TO }}
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Instalar dependências backend
+        run: python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - name: Localizar último banco de dados salvo
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          LAST=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=atlas-state&per_page=30" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')
+          echo "run_id=$LAST" >> "$GITHUB_OUTPUT"
+      - name: Restaurar histórico SQLite
+        if: steps.state.outputs.run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-state
+          run-id: ${{ steps.state.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: data
+      - name: Validar SQLite
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sqlite3
+          p = Path('data/passagens.sqlite3')
+          if p.exists():
+              with sqlite3.connect(p) as con:
+                  assert con.execute('PRAGMA quick_check').fetchone()[0] == 'ok'
+          PY
+      - name: Testar regras sem gastar créditos
+        run: python -m pytest backend/tests -q
+      - name: Importar custos conhecidos
+        run: python -m backend.app.load_extras
+      - name: Pesquisar passagens ou pular por limite de cota
+        id: scan
+        continue-on-error: true
+        env:
+          DESTINATION: ${{ github.event.inputs.destination || 'auto' }}
+        run: python -m backend.app.cloud_runner --destination "$DESTINATION"
+      - name: Exportar dados para painel
+        if: always()
+        run: python -m backend.app.export_static
+      - name: Preservar histórico e deduplicação
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-state
+          path: data/passagens.sqlite3
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Construir dashboard
+        env:
+          GITHUB_PAGES: 'true'
+          VITE_STATIC_MODE: 'true'
+        run: |
+          cd frontend
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Salvar dashboard privado
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-dashboard
+          path: frontend/dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Sinalizar eventual falha na pesquisa
+        if: steps.scan.outcome == 'failure'
+        run: exit 1
