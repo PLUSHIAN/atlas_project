@@ -25,6 +25,29 @@ def should_scan(now=None, min_hours=None):
         return False, 'Limite local de segurança para o mês; sem novas pesquisas'
     return True, 'Nova rodada elegível'
 
+def should_scan_scheduled(now=None):
+    """Evita duas consultas efetivas no mesmo slot (cron principal + retentativa).
+
+    Os horários UTC ímpares equivalem às horas pares de Brasília.
+    Consultas manuais ANTERIORES ao slot não bloqueiam a busca agendada.
+    """
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    slot_start = now.replace(minute=0, second=0, microsecond=0)
+    if slot_start.hour % 2 == 0:
+        slot_start -= timedelta(hours=1)
+    for item in db.recent_checks(100):
+        if item['status'] not in COMPLETED:
+            continue
+        checked = datetime.fromisoformat(item['checked_at'])
+        if checked.tzinfo is None:
+            checked = checked.replace(tzinfo=timezone.utc)
+        if slot_start <= checked.astimezone(timezone.utc) <= now:
+            return False, 'Esta janela agendada já tem uma pesquisa efetiva; retentativa sem consumo'
+    if db.requests_in_30d() >= settings.max_30d_requests - 1:
+        return False, 'Limite local de segurança de consultas; sem novas pesquisas'
+    return True, 'Janela agendada disponível para busca'
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='ATLAS GitHub Actions')
     parser.add_argument('--destination',default='auto',choices=[
@@ -33,12 +56,12 @@ def main(argv=None):
     if not settings.serpapi_key:
         print('SERPAPI_KEY ausente. Defina GitHub Actions Secret SERPAPI_KEY.', file=sys.stderr)
         return 2
-    # Execuções agendadas já têm cadência de 2h pelo cron. Não bloquear a
-    # primeira rodada das 18h caso tenha havido uma pesquisa manual recente.
-    # Cota SerpApi, limite de créditos e cache da rota continuam protegidos
-    # dentro de Monitor.scan_once.
-    if args.destination == 'auto' and os.environ.get('GITHUB_EVENT_NAME') != 'schedule':
-        allowed, reason = should_scan()
+    # Cron principal e contingência compartilham o mesmo slot de 2h.
+    # Execuções manuais mantêm o controle de cadência próprio.
+    if args.destination == 'auto':
+        allowed, reason = (should_scan_scheduled()
+                           if os.environ.get('GITHUB_EVENT_NAME') == 'schedule'
+                           else should_scan())
         if not allowed:
             print(json.dumps({'status':'aguardando_cota','message':reason},ensure_ascii=False))
             return 0
