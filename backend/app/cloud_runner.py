@@ -28,12 +28,12 @@ def should_scan(now=None, min_hours=None):
 def should_scan_scheduled(now=None):
     """Evita duas consultas efetivas no mesmo slot (cron principal + retentativa).
 
-    Os horários UTC ímpares equivalem às horas pares de Brasília.
+    Os horários UTC pares equivalem às horas ímpares de Brasília.
     Consultas manuais ANTERIORES ao slot não bloqueiam a busca agendada.
     """
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     slot_start = now.replace(minute=0, second=0, microsecond=0)
-    if slot_start.hour % 2 == 0:
+    if slot_start.hour % 2 == 1:
         slot_start -= timedelta(hours=1)
     for item in db.recent_checks(100):
         if item['status'] not in COMPLETED:
