@@ -38,10 +38,10 @@ jobs:
       OPEN_JAW_ENABLED: 'true'
       SPAIN_PRIORITY: 'true'
       SCAN_INTERVAL_HOURS: '2'
-      CLOUD_MIN_SCAN_HOURS: '8'
-      MAX_REQUESTS_30D: '210'
+      CLOUD_MIN_SCAN_HOURS: '2'
+      MAX_REQUESTS_30D: '250'
       MAX_RETURN_CHECKS_PER_SCAN: '2'
-      CACHE_HOURS: '12'
+      CACHE_HOURS: '1'
       DB_PATH: 'data/passagens.sqlite3'
       ATLAS_STATE_KEY: ${{ secrets.ATLAS_STATE_KEY }}
       # Gmail: valores não confidenciais definidos no workflow.
@@ -123,7 +123,7 @@ jobs:
       - name: Incorporar custos de deslocamento informados manualmente
         run: python -m backend.app.load_extras
 
-      - name: Pesquisar passagens ou pular por economia de cota
+      - name: Pesquisar passagens a cada 2h (respeitar cota da fonte)
         id: scan
         continue-on-error: true
         shell: bash
