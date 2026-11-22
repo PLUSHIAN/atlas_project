@@ -113,3 +113,26 @@ def test_fallback_at_midnight_utc_deduplicates_correct_slot(monkeypatch):
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status':'cotado','checked_at':datetime(2026,11,23,0,3,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
+
+
+def test_push_initial_run_shares_scheduled_slot(monkeypatch):
+    """Primeiro disparo por push é automático e usa mesma trava das contingências."""
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'push')
+    monkeypatch.setattr(cloud_runner.settings, 'serpapi_key', 'CHAVE_TESTE_NAO_REAL')
+    monkeypatch.setattr(cloud_runner, 'should_scan', lambda: (_ for _ in ()).throw(
+        AssertionError('push não deve usar a janela manual')))
+    called = []
+    monkeypatch.setattr(cloud_runner, 'should_scan_scheduled', lambda: (True, 'slot disponível'))
+    monkeypatch.setattr(cloud_runner.monitor, 'scan_once', lambda destination=None: (
+        called.append(destination) or {'status': 'sem_resultado'}))
+    assert cloud_runner.main([]) == 0
+    assert called == [None]
+
+
+def test_push_initial_run_skips_if_same_slot_was_queried(monkeypatch):
+    monkeypatch.setenv('GITHUB_EVENT_NAME', 'push')
+    monkeypatch.setattr(cloud_runner.settings, 'serpapi_key', 'CHAVE_TESTE_NAO_REAL')
+    monkeypatch.setattr(cloud_runner, 'should_scan_scheduled', lambda: (False, 'já pesquisado'))
+    monkeypatch.setattr(cloud_runner.monitor, 'scan_once', lambda destination=None: (
+        _ for _ in ()).throw(AssertionError('não pode duplicar pesquisa')))
+    assert cloud_runner.main([]) == 0
