@@ -137,7 +137,13 @@ jobs:
               print('Primeira execução; o SQLite será criado')
           PY
 
-      - name: Rodar testes Python (sem consultar API)
+      - name: Rodar testes Python isolados (sem consultar API ou SMTP)
+        env:
+          # Nunca permitir que testes toquem no SQLite histórico de produção.
+          DB_PATH: 'data/atlas-ci-scratch.sqlite3'
+          SERPAPI_KEY: ''
+          MAIL_ENABLED: 'false'
+          SMTP_PASSWORD: ''
         run: python -m pytest backend/tests -q
 
       - name: Incorporar custos de deslocamento informados manualmente
