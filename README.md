@@ -2,13 +2,23 @@
 
 Monitor pessoal de passagens para dois adultos com prioridade para Barcelona e Madri, incluindo Roma, Milão e multidestinos.
 
-## GitHub Actions (repositório privado)
+## Ativação do GitHub Pages (quando o repositório for público)
+
+O workflow já publica o React via `actions/deploy-pages@v4` se o repositório estiver público.
+
+**Antes de mudar a visibilidade:** crie em **Settings > Secrets and variables > Actions** o secret `ATLAS_STATE_KEY` com pelo menos 32 caracteres aleatórios e execute uma vez o workflow ainda com o repositório privado. Confirme que o artefato `atlas-state-encrypted` foi criado. Atenção: os novos workflows **não recuperam automaticamente bancos antigos** armazenados em artefatos `atlas-state`. Exclua os antigos artefatos `atlas-state` sem criptografia antes de tornar o repositório público; eles podem conter histórico e dados pessoais.
+
+Depois acesse **Settings > General > Danger Zone > Change repository visibility > Make public**. Em **Settings > Pages**, escolha **Build and deployment > Source > GitHub Actions**. Rode **Actions > ATLAS - Passagens Europa > Run workflow** e verifique o link [ATLAS no GitHub Pages](https://plushian.github.io/atlas_project/).
+
+**O frontend será público e somente leitura.** O backend FastAPI continuará executando apenas durante o Actions, não como serviço 24h.
+
+## GitHub Actions (agendamento e armazenamento)
 
 - `.github/workflows/atlas.yml` é acionado a cada 2 horas (UTC, minuto 17), mas só pesquisa quando a janela de economia permite (8h por padrão).
 - O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
-- O histórico SQLite é restaurado e salvo via artifact privado `atlas-state` por 30 dias. Sem estado anterior, cria banco novo; baixe backups periodicamente.
-- O frontend React é compilado a cada execução e disponibilizado como artifact privado `atlas-dashboard` (arquivos estáticos), sem site público neste repositório.
-- Para site com URL pública usando GitHub Pages no plano gratuito, o repositório deve ser público. **Não alteramos a visibilidade sem sua autorização**.
+- O histórico SQLite é restaurado e salvo como artefato criptografado `atlas-state-encrypted` por até 30 dias. `ATLAS_STATE_KEY` é obrigatório; mantenha uma cópia segura da chave e faça backups periódicos.
+- O React é compilado em modo estático e entregue como artefato `atlas-dashboard`. Quando o repositório for público e Pages estiver ativado, também será publicado como website.
+- A mudança da visibilidade para público deve ser feita pelo proprietário na interface do GitHub; a integração de código não oferece essa configuração.
 
 ## Configurar a primeira execução
 
