@@ -66,3 +66,10 @@
 .tracking-actions .outline{flex:1;padding:9px 11px;white-space:nowrap;justify-content:center}
 @media(max-width:840px){.insight-grid,.tracking-grid,.google-instructions{grid-template-columns:1fr}}
 @media(min-width:1400px){.insight-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* Seletores de aeroportos para buscas prontas do Google Flights */
+.tracking-airport-selectors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tracking-airport-selectors label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.tracking-airport-selectors select{width:100%;min-width:0;background:var(--panel);color:var(--text);border:1px solid var(--edge);border-radius:9px;padding:9px 11px;font-size:13px}
+.tracking-actions a.outline{white-space:normal;text-align:center;min-height:40px}
+@media(max-width:420px){.tracking-airport-selectors{grid-template-columns:1fr}}
