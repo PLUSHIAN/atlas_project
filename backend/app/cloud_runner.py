@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from .main import db, monitor, settings
 
@@ -28,12 +29,12 @@ def should_scan(now=None, min_hours=None):
 def should_scan_scheduled(now=None):
     """Evita duas consultas efetivas no mesmo slot (cron principal + retentativa).
 
-    Os horários UTC pares equivalem às horas ímpares de Brasília.
+    Os horários UTC ímpares equivalem às horas pares de Brasília.
     Consultas manuais ANTERIORES ao slot não bloqueiam a busca agendada.
     """
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     slot_start = now.replace(minute=0, second=0, microsecond=0)
-    if slot_start.hour % 2 == 1:
+    if slot_start.hour % 2 == 0:
         slot_start -= timedelta(hours=1)
     for item in db.recent_checks(100):
         if item['status'] not in COMPLETED:
@@ -48,13 +49,36 @@ def should_scan_scheduled(now=None):
     return True, 'Janela agendada disponível para busca'
 
 
+
+def write_run_report(result, searched):
+    """Relatório público apenas de status; nunca inclui credenciais ou dados brutos."""
+    path = os.environ.get('ATLAS_RUN_REPORT', '').strip()
+    if not path:
+        return
+    data = {
+        'event': os.environ.get('GITHUB_EVENT_NAME', 'local'),
+        'run_id': os.environ.get('GITHUB_RUN_ID', ''),
+        'at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'status': str(result.get('status', 'erro'))[:48],
+        'searched': bool(searched),
+        'destination': str(result.get('destination') or '')[:64],
+        'message': str(result.get('message') or '')[:240]
+    }
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='ATLAS GitHub Actions')
     parser.add_argument('--destination',default='auto',choices=[
         'auto','Barcelona','Madri','Roma','Milão','Roma → Milão','Milão → Roma'])
     args = parser.parse_args(argv)
     if not settings.serpapi_key:
-        print('SERPAPI_KEY ausente. Defina GitHub Actions Secret SERPAPI_KEY.', file=sys.stderr)
+        message = 'SERPAPI_KEY ausente. Defina GitHub Actions Secret SERPAPI_KEY.'
+        print(message, file=sys.stderr)
+        write_run_report({'status': 'erro', 'message': message}, searched=False)
         return 2
     # Cron principal, 3 contingências e o disparo inicial por push compartilham
     # o mesmo slot de 2h. Execuções manuais mantêm a própria cadência.
@@ -63,9 +87,14 @@ def main(argv=None):
                            if os.environ.get('GITHUB_EVENT_NAME') in ('schedule', 'push')
                            else should_scan())
         if not allowed:
-            print(json.dumps({'status':'aguardando_cota','message':reason},ensure_ascii=False))
+            report = {'status':'aguardando_cota','message':reason}
+            write_run_report(report, searched=False)
+            print(json.dumps(report, ensure_ascii=False))
             return 0
+    before_requests = db.requests_in_30d()
     result = monitor.scan_once(destination=None if args.destination=='auto' else args.destination)
+    new_requests = db.requests_in_30d() - before_requests
+    write_run_report(result, searched=new_requests > 0)
     print(json.dumps(result,ensure_ascii=False,default=str))
     return 1 if result.get('status') in ('erro','ocupado') else 0
 
