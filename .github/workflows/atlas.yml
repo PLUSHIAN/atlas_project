@@ -1,7 +1,7 @@
 name: ATLAS - Passagens Europa
 
 on:
-  # Primeiro disparo automático ao publicar esta alteração na branch main.
+  # Bootstrap imediato automático ao publicar esta alteração na branch main.
   # Alterações de frontend são publicadas por este workflow sem exigir pesquisa extra.
   # Atualizações de frontend e backend também publicam o painel automaticamente.
   push:
@@ -11,15 +11,14 @@ on:
       - 'frontend/**'
       - 'backend/app/**'
   schedule:
-    # UTC ímpar = Brasília par (18h, 20h, 22h, ...). Quatro tentativas por ciclo.
-    # O evento push dispara imediatamente a primeira tentativa automática após a publicação.
-    # As rodadas regulares ocorrem de 2 em 2 horas (18h37, 20h37, 22h37...).
-    # As três contingências são 5, 10 e 15 minutos após a principal.
-    # Os checks no SQLite impedem 2 buscas válidas no mesmo ciclo.
-    - cron: '37 1-23/2 * * *'
-    - cron: '42 1-23/2 * * *'
-    - cron: '47 1-23/2 * * *'
-    - cron: '52 1-23/2 * * *'
+    # Horário de Brasília (UTC-3): 19h12, 21h12, 23h12, 01h12...
+    # Três contingências por janela (+5, +10 e +15 minutos).
+    # Na primeira implantação, o push abaixo inicia uma busca sem clique manual.
+    # Os retries só consomem SerpApi quando não houve consulta efetiva no slot.
+    - cron: '12 */2 * * *'
+    - cron: '17 */2 * * *'
+    - cron: '22 */2 * * *'
+    - cron: '27 */2 * * *'
   workflow_dispatch:
     inputs:
       destination:
@@ -81,7 +80,7 @@ jobs:
         run: |
           echo "Evento: ${GITHUB_EVENT_NAME}"
           echo "Branch: ${GITHUB_REF_NAME}"
-          echo "Agenda UTC: horas ímpares / minutos 37, 42, 47, 52"
+          echo "Agenda UTC: horas pares / minutos 12, 17, 22, 27"
           echo "Disparo: ${{ github.event.schedule || 'push/manual' }}"
 
       - name: Configurar Python
