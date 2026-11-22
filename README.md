@@ -59,7 +59,7 @@ O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HO
 
 ## Google Flights: alertas gratuitos oficiais
 
-O ATLAS agora mostra **cobertura por destino e data**, separa tarifas indicativas de viagens completas e distribui a fila para explorar as quatro datas antes de repetir a mesma saída. A aba **Alertas Google** apresenta um roteiro de rotas e datas para configurar na interface oficial.
+O ATLAS agora mostra **cobertura por destino e data**, separa tarifas indicativas de viagens completas e distribui a fila para explorar as quatro datas antes de repetir a mesma saída. A aba **Alertas Google** oferece buscas já preenchidas: selecione o aeroporto de saída (GRU/CGH/VCP ou GIG/SDU), o destino (incluindo MXP/BGY/LIN para Milão) e clique em uma das duas datas de volta. Os links montam uma busca textual do Google Flights com ida, volta, 2 adultos, econômica e BRL. O Google pode reinterpretar o filtro de passageiros: confira a pesquisa ao abrir.
 
 **Importante:** o ATLAS **não ativa automaticamente** os acompanhamentos de preços do Google. Para receber os avisos oficiais, abra https://www.google.com/travel/flights?hl=pt-BR com sua conta Google, escolha origem, destino, datas, 2 adultos, econômica e ative **Acompanhar preços**. Repita para as rotas que desejar. O Google envia os avisos diretamente para o Gmail vinculado à conta; o ATLAS não recebe nem importa esses avisos automaticamente. O Google controla quando avisa, sem prazo fixo. Não usamos scraping ou APIs não oficiais do Google Flights.
 
