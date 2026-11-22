@@ -1,12 +1,21 @@
 name: ATLAS - Passagens Europa
 
 on:
+  # Primeiro disparo automático ao publicar esta alteração na branch main.
+  # Editar apenas outros arquivos não provoca novas consultas imediatas.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/atlas.yml'
   schedule:
-    # Horário de Brasília (UTC-3): 01h, 03h, ..., 19h, 21h, 23h.
-    # Tentativa principal no minuto 00; contingência no minuto 11.
-    # Se a primeira busca foi concluída, a retentativa não consome créditos.
-    - cron: '0 */2 * * *'
-    - cron: '11 */2 * * *'
+    # UTC ímpar = Brasília par (18h, 20h, 22h, ...). Quatro tentativas por ciclo.
+    # Primeiro horário após a ativação de 22/11/2026: 18h37 de Brasília.
+    # As três contingências são 5, 10 e 15 minutos após a principal.
+    # Os checks no SQLite impedem 2 buscas válidas no mesmo ciclo.
+    - cron: '37 1-23/2 * * *'
+    - cron: '42 1-23/2 * * *'
+    - cron: '47 1-23/2 * * *'
+    - cron: '52 1-23/2 * * *'
   workflow_dispatch:
     inputs:
       destination:
@@ -67,7 +76,8 @@ jobs:
         run: |
           echo "Evento: ${GITHUB_EVENT_NAME}"
           echo "Branch: ${GITHUB_REF_NAME}"
-          echo "Agendamento UTC: horas pares, minuto 00 + contingência minuto 11"
+          echo "Agenda UTC: horas ímpares / minutos 37, 42, 47, 52"
+          echo "Disparo: ${{ github.event.schedule || 'push/manual' }}"
 
       - name: Configurar Python
         uses: actions/setup-python@v6
