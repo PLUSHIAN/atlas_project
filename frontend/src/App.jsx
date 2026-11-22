@@ -31,7 +31,7 @@ export default function App(){
  const [formMessage,setFormMessage]=useState('');
  const [compareMode,setCompareMode]=useState('total');
  const [rankings,setRankings]=useState({international_cheapest:[],best_value:[],lowest_known_total:[],without_additional_costs:[],sample_size:0});
- const [marketReference,setMarketReference]=useState([]);const [diagnostics,setDiagnostics]=useState([]);const [coverageInsights,setCoverageInsights]=useState([]);const [showAllTracking,setShowAllTracking]=useState(false);
+ const [marketReference,setMarketReference]=useState([]);const [diagnostics,setDiagnostics]=useState([]);const [coverageInsights,setCoverageInsights]=useState([]);const [showAllTracking,setShowAllTracking]=useState(false);const [lastExecution,setLastExecution]=useState(null);
  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('europa-theme',theme)},[theme]);
  const load=async()=>{try{
   let o,a,h,c,e,s,rankingData,referenceData,diagnosticData,coverageData;
@@ -39,7 +39,7 @@ export default function App(){
    const response=await fetch(`${import.meta.env.BASE_URL}atlas-data.json?t=${Date.now()}`,{cache:'no-store'});
    if(!response.ok) throw new Error('Snapshot não publicado');
    const data=await response.json();
-   ({overview:o,offers:a,history:h,checks:c,extras:e,snapshots:s,rankings:rankingData,market_reference:referenceData,diagnostics:diagnosticData,coverage_insights:coverageData}=data);
+   ({overview:o,offers:a,history:h,checks:c,extras:e,snapshots:s,rankings:rankingData,market_reference:referenceData,diagnostics:diagnosticData,coverage_insights:coverageData}=data);setLastExecution(data.last_execution||null);
   }else{
    const responses=await Promise.all(['/api/overview','/api/offers','/api/history','/api/checks','/api/extras','/api/snapshots','/api/rankings','/api/market-reference','/api/diagnostics','/api/coverage-insights'].map(u=>fetch(u)));
    if(responses.some(r=>!r.ok))throw new Error('Servidor indisponível ou resposta inválida');
@@ -117,6 +117,15 @@ export default function App(){
     {error&&<div className="notice error"><AlertTriangle size={18}/><span>{error}</span><button onClick={()=>setError('')}><X size={18}/></button></div>}
     {scanNotice&&<div className="notice info"><Info size={18}/><span>{scanNotice}</span><button onClick={()=>setScanNotice('')}><X size={18}/></button></div>}
     {STATIC_MODE&&<div className="notice info"><Info size={18}/><span>Modo GitHub Pages: painel de consulta, sem servidor ligado. Workflow agendado a cada 2 horas; para preservar a cota gratuita, as buscas efetivas respeitam o saldo da fonte e o cache. Dados históricos, não ofertas garantidas.</span></div>}
+    {STATIC_MODE&&lastExecution&&<div className={'notice '+(lastExecution.status==='erro'?'error':'info')}>
+      {lastExecution.searched?<CheckCircle2 size={19}/>:<Info size={19}/>}
+      <span><strong>{lastExecution.searched?'Pesquisa real executada':'GitHub executou, mas não houve nova consulta'}</strong>
+      {' · '}{when(lastExecution.at)}
+      {' · '}{lastExecution.event==='schedule'?'Agendado':lastExecution.event==='push'?'Automático por atualização':'Manual'}
+      {lastExecution.destination?' · '+lastExecution.destination:''}
+      <small style={{display:'block',marginTop:5}}>{lastExecution.message||'Veja o histórico para detalhes.'}</small>
+      </span>{lastExecution.run_id&&<a href={'https://github.com/PLUSHIAN/atlas_project/actions/runs/'+lastExecution.run_id} target="_blank" rel="noopener noreferrer">Ver execução <ExternalLink size={14}/></a>}
+     </div>}
     {view==='dashboard'&&<>
       <section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="sparkle">✦</span> SUA PRÓXIMA AVENTURA</div><h1>O melhor caminho<br/>para a <em>Itália.</em></h1><p>Estamos de olho nas passagens para vocês dois. Compare São Paulo, Rio e quatro portas de entrada na Europa, sem perder o controle do orçamento.</p><div className="hero-chips"><span><CalendarDays size={15}/> Setembro de 2027</span><span><Globe2 size={15}/> 2 passageiros</span><span><Wallet size={15}/> Até R$ 8 mil</span></div></div><div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><span className="big-plane">✈</span><div className="italy-outline">ITALIA</div><div className="art-label">SÃO PAULO / RIO <ArrowRight size={14}/> EUROPA</div></div></section>
       {!STATIC_MODE&&!st.configured&&<div className="notice info"><Info size={18}/><span><strong>Primeiro acesso:</strong> informe a SERPAPI_KEY no <code>.env</code> e reinicie o backend. Nenhuma cotação fictícia é apresentada.</span><button onClick={()=>setView('settings')}>Ver configuração <ArrowRight size={15}/></button></div>}
