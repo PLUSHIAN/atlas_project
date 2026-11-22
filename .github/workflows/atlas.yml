@@ -43,6 +43,7 @@ jobs:
       MAX_RETURN_CHECKS_PER_SCAN: '2'
       CACHE_HOURS: '12'
       DB_PATH: 'data/passagens.sqlite3'
+      ATLAS_STATE_KEY: ${{ secrets.ATLAS_STATE_KEY }}
       MAIL_ENABLED: ${{ secrets.MAIL_ENABLED }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
@@ -65,13 +66,22 @@ jobs:
       - name: Instalar dependências backend
         run: python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
-      - name: Localizar último SQLite salvo em artefato
+      - name: Validar criptografia do histórico
+        shell: bash
+        run: |
+          if [ -z "$ATLAS_STATE_KEY" ]; then
+            echo "::error::Configure o secret ATLAS_STATE_KEY antes de executar. Isso protege o histórico do SQLite quando o repositório for público."
+            exit 1
+          fi
+          python -m pip install 'cryptography>=44,<47'
+
+      - name: Localizar último estado criptografado
         id: state
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          LAST=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=atlas-state&per_page=30" \
+          LAST=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=atlas-state-encrypted&per_page=30" \
             --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | reverse | .[0].workflow_run.id // empty')
           echo "run_id=$LAST" >> "$GITHUB_OUTPUT"
           if [ -n "$LAST" ]; then echo "Estado anterior: run $LAST"; else echo "Primeira execução: novo banco"; fi
@@ -80,10 +90,14 @@ jobs:
         if: steps.state.outputs.run_id != ''
         uses: actions/download-artifact@v4
         with:
-          name: atlas-state
+          name: atlas-state-encrypted
           run-id: ${{ steps.state.outputs.run_id }}
           github-token: ${{ github.token }}
-          path: data
+          path: state
+
+      - name: Descriptografar histórico anterior
+        if: steps.state.outputs.run_id != ''
+        run: python -m backend.app.state_artifact decrypt state/atlas-state.enc data/passagens.sqlite3
 
       - name: Verificar integridade do banco restaurado
         run: |
@@ -116,12 +130,19 @@ jobs:
       - name: Exportar snapshot público (somente dados necessários)
         run: python -m backend.app.export_static
 
-      - name: Salvar SQLite para a próxima execução
-        if: always()
+      - name: Criptografar estado persistente
+        if: always() && env.ATLAS_STATE_KEY != ''
+        run: |
+          if [ -f data/passagens.sqlite3 ]; then
+            python -m backend.app.state_artifact encrypt data/passagens.sqlite3 state/atlas-state.enc
+          fi
+
+      - name: Salvar somente SQLite criptografado
+        if: always() && env.ATLAS_STATE_KEY != ''
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-state
-          path: data/passagens.sqlite3
+          name: atlas-state-encrypted
+          path: state/atlas-state.enc
           if-no-files-found: warn
           retention-days: 30
           compression-level: 6
@@ -148,8 +169,29 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Preparar arquivos públicos para o GitHub Pages
+        if: github.event.repository.private == false
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist/
+
       - name: Indicar falha de consulta sem perder histórico ou dashboard
         if: steps.scan.outcome == 'failure'
         run: |
           echo 'Pesquisa falhou. Confira o log. SQLite e painel foram preservados como artifacts.'
           exit 1
+
+  deploy-pages:
+    if: github.event.repository.private == false
+    needs: scan-build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar dashboard no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
