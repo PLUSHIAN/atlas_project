@@ -14,7 +14,7 @@ Depois acesse **Settings > General > Danger Zone > Change repository visibility 
 
 ## GitHub Actions (agendamento e armazenamento)
 
-- `.github/workflows/atlas.yml` é acionado a cada 2 horas (UTC, minuto 17), mas só pesquisa quando a janela de economia permite (8h por padrão).
+- `.github/workflows/atlas.yml` é acionado a cada 2 horas (UTC, minuto 17), com tentativa de pesquisa a cada execução (intervalo mínimo de 2h).
 - O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
 - O histórico SQLite é restaurado e salvo como artefato criptografado `atlas-state-encrypted` por até 30 dias. `ATLAS_STATE_KEY` é obrigatório; mantenha uma cópia segura da chave e faça backups periódicos.
 - O React é compilado em modo estático e entregue como artefato `atlas-dashboard`. Quando o repositório for público e Pages estiver ativado, também será publicado como website.
@@ -50,3 +50,8 @@ Painel local: `http://127.0.0.1:5173`. A versão para GitHub gera arquivos em `f
 Execute testes locais: `python -m pip install -r backend/requirements-dev.txt; python -m pytest backend/tests -q`.
 
 Nunca envie `.env`, bancos locais, `.venv` ou senhas ao GitHub. A chave publicada previamente em chat deve ter sido substituída.
+
+
+## Black Friday 2026: cadência reforçada
+
+O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HOURS=1`, priorizando Espanha. Não há mais janela obrigatória de 8 horas. O agendamento GitHub `17 */2 * * *` é em UTC e pode atrasar ou eventualmente falhar; o monitor não garante execução no minuto exato. O robô para de consultar quando a conta não tiver créditos gratuitos ou o teto local for atingido, sem gerar cobranças. Como cada rodada pode consumir duas ou três consultas, 12 rodadas diárias podem consumir até aproximadamente 24 a 36 créditos/dia.
