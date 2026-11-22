@@ -3,11 +3,13 @@ name: ATLAS - Passagens Europa
 on:
   # Primeiro disparo automático ao publicar esta alteração na branch main.
   # Alterações de frontend são publicadas por este workflow sem exigir pesquisa extra.
-  # Este push publica a versão com links Google Flights já preenchidos.
+  # Atualizações de frontend e backend também publicam o painel automaticamente.
   push:
     branches: [main]
     paths:
       - '.github/workflows/atlas.yml'
+      - 'frontend/**'
+      - 'backend/app/**'
   schedule:
     # UTC ímpar = Brasília par (18h, 20h, 22h, ...). Quatro tentativas por ciclo.
     # O evento push dispara imediatamente a primeira tentativa automática após a publicação.
