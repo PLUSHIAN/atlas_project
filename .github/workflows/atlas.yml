@@ -13,7 +13,7 @@ on:
   schedule:
     # Horário de Brasília (UTC-3): 19h12, 21h12, 23h12, 01h12...
     # Três contingências por janela (+5, +10 e +15 minutos).
-    # Na primeira implantação, o push abaixo inicia uma busca sem clique manual.
+    # Ao publicar esta configuração, o evento push inicia uma tentativa imediata sem clique manual.
     # Os retries só consomem SerpApi quando não houve consulta efetiva no slot.
     - cron: '12 */2 * * *'
     - cron: '17 */2 * * *'
