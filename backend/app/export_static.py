@@ -46,6 +46,7 @@ def create_snapshot():
         'snapshots': api.snapshots(limit=150),
         'rankings': api.rankings(),
         'market_reference': api.market_reference(),
+        'coverage_insights': api.coverage_insights(),
         'diagnostics': api.diagnostics(limit=35),
     })
 
