@@ -9,9 +9,9 @@ from .main import db, monitor, settings
 COMPLETED = {'cotado','somente_indicativo','resultados_descartados','sem_resultado','parcial'}
 
 def should_scan(now=None, min_hours=None):
-    """O workflow roda a cada 2h, mas limita pesquisas pagas para proteger os 250 créditos/mês."""
+    """Permite pesquisa a cada 2h, respeitando apenas o teto de créditos da SerpApi."""
     now = now or datetime.now(timezone.utc)
-    min_hours = int(min_hours if min_hours is not None else os.environ.get('CLOUD_MIN_SCAN_HOURS','8'))
+    min_hours = int(min_hours if min_hours is not None else os.environ.get('CLOUD_MIN_SCAN_HOURS','2'))
     if min_hours < 2:
         raise ValueError('CLOUD_MIN_SCAN_HOURS deve ser >= 2')
     recent = db.recent_checks(100)
