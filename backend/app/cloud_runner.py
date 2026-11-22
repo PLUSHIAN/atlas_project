@@ -33,7 +33,11 @@ def main(argv=None):
     if not settings.serpapi_key:
         print('SERPAPI_KEY ausente. Defina GitHub Actions Secret SERPAPI_KEY.', file=sys.stderr)
         return 2
-    if args.destination == 'auto':
+    # Execuções agendadas já têm cadência de 2h pelo cron. Não bloquear a
+    # primeira rodada das 18h caso tenha havido uma pesquisa manual recente.
+    # Cota SerpApi, limite de créditos e cache da rota continuam protegidos
+    # dentro de Monitor.scan_once.
+    if args.destination == 'auto' and os.environ.get('GITHUB_EVENT_NAME') != 'schedule':
         allowed, reason = should_scan()
         if not allowed:
             print(json.dumps({'status':'aguardando_cota','message':reason},ensure_ascii=False))
