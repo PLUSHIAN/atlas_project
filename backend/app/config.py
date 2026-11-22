@@ -24,7 +24,7 @@ class Settings:
     spain_priority: bool = bool_env('SPAIN_PRIORITY', True)
     scan_enabled: bool = bool_env('MONITOR_ENABLED', True)
     scan_interval_hours: int = max(1, int(os.getenv('SCAN_INTERVAL_HOURS', '6')))
-    max_30d_requests: int = min(220, max(2, int(os.getenv('MAX_REQUESTS_30D', '210'))))
+    max_30d_requests: int = min(250, max(2, int(os.getenv('MAX_REQUESTS_30D', '210'))))
     cache_hours: int = max(1, int(os.getenv('CACHE_HOURS', '12')))
     max_return_checks_per_scan: int = min(2,max(1,int(os.getenv('MAX_RETURN_CHECKS_PER_SCAN','2'))))
     app_api_token: str = os.getenv('APP_API_TOKEN', '').strip()
