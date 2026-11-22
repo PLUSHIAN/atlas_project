@@ -75,3 +75,12 @@ Os e-mails **do ATLAS** continuam independentes e são disparados por cotações
 - O histórico SQLite impede repetir uma pesquisa **concluída** no mesmo ciclo. Os retries só consultam a fonte se não houver consulta efetiva gravada no ciclo; o custo em créditos SerpApi pode aumentar se as buscas falharem repetidamente.
 - GitHub Actions pode atrasar ou descartar **todas** as tentativas; não existe SLA ou garantia de início pontual. Para identificar a origem no log, procure `Evento: push` (automático por commit), `Evento: schedule` (automático por cron) ou `Evento: workflow_dispatch` (manual).
 - Para verificar: https://github.com/PLUSHIAN/atlas_project/actions/workflows/atlas.yml . Pesquisas e e-mails dependem dos Secrets e da cota disponível.
+
+
+## Google Flights: links preenchidos e contabilidade da API (novembro/2026)
+
+- A aba **Alertas Google** monta links de pesquisa com o parâmetro `tfs` (dados codificados de origem, destino, ida, volta, dois adultos e econômica) e moeda `BRL`. Diferentemente do parâmetro `q`, ignorado pelo Google Flights nos testes de tela, `tfs` contém a estrutura da pesquisa.
+- `tfs` é um formato interno **não documentado oficialmente pelo Google** e pode mudar. O ATLAS **não faz scraping nem acessa o Google automaticamente**. Ao abrir o link, confira os filtros e ative **Acompanhar preços** manualmente.
+- Os cartões mostram agora **USO MENSAL DA SERPAPI** a partir do endpoint oficial de conta (`this_month_usage`, `searches_per_month` e `plan_searches_left`), não a contagem do SQLite. Se o saldo da fonte estiver indisponível, exibem **—**, sem substituir por um número local enganoso.
+- A contagem `used_requests_30d` continua sendo uma trava **independente** dos últimos 30 dias do ATLAS; não deve coincidir com o ciclo mensal da SerpApi nem incluir consumos realizados fora do ATLAS.
+- Para alterar agendamento, preservar a cota de 250 pesquisas mensais do plano gratuito; consultas de ida e volta podem consumir duas ou mais chamadas.
