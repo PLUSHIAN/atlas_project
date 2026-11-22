@@ -143,6 +143,7 @@ jobs:
           DB_PATH: 'data/atlas-ci-scratch.sqlite3'
           SERPAPI_KEY: ''
           MAIL_ENABLED: 'false'
+          SMTP_USER: ''
           SMTP_PASSWORD: ''
         run: python -m pytest backend/tests -q
 
