@@ -86,22 +86,30 @@ def test_manual_auto_still_obeys_cooldown(monkeypatch):
 
 
 def test_fallback_skips_when_slot_already_queried(monkeypatch):
-    now = datetime(2026, 11, 22, 21, 11, tzinfo=timezone.utc)  # 18h11 Brasília
+    now = datetime(2026, 11, 22, 22, 11, tzinfo=timezone.utc)  # 19h11 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'somente_indicativo','checked_at':datetime(2026,11,22,21,1,tzinfo=timezone.utc).isoformat()}])
+        {'status':'somente_indicativo','checked_at':datetime(2026,11,22,22,1,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
 
 
 def test_fallback_runs_when_primary_was_missed(monkeypatch):
-    now = datetime(2026, 11, 22, 21, 11, tzinfo=timezone.utc)  # 18h11 Brasília
+    now = datetime(2026, 11, 22, 22, 11, tzinfo=timezone.utc)  # 19h11 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'cotado','checked_at':datetime(2026,11,22,20,59,tzinfo=timezone.utc).isoformat()}])
+        {'status':'cotado','checked_at':datetime(2026,11,22,21,59,tzinfo=timezone.utc).isoformat()}])
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
     assert cloud_runner.should_scan_scheduled(now)[0] is True
 
 
 def test_scheduled_late_primary_is_not_duplicate(monkeypatch):
-    now = datetime(2026, 11, 22, 22, 5, tzinfo=timezone.utc)  # atraso de 65 minutos
+    now = datetime(2026, 11, 22, 23, 5, tzinfo=timezone.utc)  # atraso de 65 minutos
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'cotado','checked_at':datetime(2026,11,22,21,12,tzinfo=timezone.utc).isoformat()}])
+        {'status':'cotado','checked_at':datetime(2026,11,22,22,12,tzinfo=timezone.utc).isoformat()}])
+    assert cloud_runner.should_scan_scheduled(now)[0] is False
+
+
+def test_fallback_at_midnight_utc_deduplicates_correct_slot(monkeypatch):
+    # 00h UTC equivale às 21h Brasília do dia anterior.
+    now = datetime(2026, 11, 23, 0, 11, tzinfo=timezone.utc)
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status':'cotado','checked_at':datetime(2026,11,23,0,3,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
