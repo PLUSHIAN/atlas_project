@@ -134,6 +134,18 @@ export default function App(){
        <div className="city-grid">{(st.city_coverage||[]).map(city=><div className="city-card" key={city.city}><div className="city-card-top"><strong>{city.city}</strong><Badge tone={city.consulted>0?'green':'neutral'}>{city.consulted>0?'Consultado':city.attempted>0?'Tentativa sem sucesso':'Não consultado'}</Badge></div><div className="city-card-meta">{city.consulted} de {city.total} combinações consultadas</div><small>{city.last_checked?'Última tentativa: '+when(city.last_checked):'Nenhuma tentativa registrada'}</small><button className="outline" onClick={()=>scan(city.city)} disabled={busy||st.running||!st.configured}>Pesquisar {city.city}</button></div>)}</div>
        <p className="muted city-footnote">Milão inclui MXP, BGY e LIN. As origens também são agrupadas. Uma pesquisa pode não retornar todas as opções do grupo.</p>
       </section>
+      <section className="panel insight-panel">
+       <div className="panel-head"><div><div className="section-kicker">COBERTURA POR CIDADE E DATA</div><h2>Quais preços já vimos e o que falta pesquisar?</h2></div><button className="link-button" onClick={()=>setView('google')}>Alertas gratuitos do Google <ArrowRight size={15}/></button></div>
+       <p className="muted note">Os números representam combinações agrupadas de aeroportos, não todos os voos individuais. Prévia é apenas indicativa, sem volta validada. O preço de ida e volta validado aparece separado.</p>
+       <div className="insight-grid">{coverageInsights.filter(x=>['Barcelona','Madri','Roma','Milão'].includes(x.city)).sort((a,b)=>['Barcelona','Madri','Roma','Milão'].indexOf(a.city)-['Barcelona','Madri','Roma','Milão'].indexOf(b.city)).map(x=><div className="insight-card" key={x.city}>
+        <div className="insight-card-head"><strong>{x.city}</strong><Badge tone={x.consulted?'green':'neutral'}>{x.dates_covered}/{x.dates_total} datas</Badge></div>
+        <div className="insight-price"><span>Menor ida + volta validada</span><strong>{money(x.min_complete)}</strong></div>
+        <div className="insight-price"><span>Menor prévia observada</span><strong>{money(x.min_indicative)}</strong></div>
+        <small className="muted">{x.consulted}/{x.total} combinações agrupadas · {x.sample_size} prévias</small>
+        <div className="date-coverage">{x.dates.map(d=><div className="date-coverage-row" key={d.departure}><span>{day(d.departure)} · {d.consulted}/{d.total}</span><strong>{money(d.min_indicative)}</strong></div>)}</div>
+        <small className="muted">{x.last_attempt?'Última tentativa: '+when(x.last_attempt):'Ainda não pesquisada'}</small>
+       </div>)}</div>
+      </section>
       <section className="panel market-panel">
        <div className="panel-head"><div><div className="section-kicker">REFERÊNCIA DE MERCADO</div><h2>Quanto estão custando as passagens?</h2></div><button className="link-button" onClick={()=>setView('history')}>Ver todas as prévias <ArrowRight size={15}/></button></div>
        <p className="muted market-explain">As menores prévias entre as últimas 150 observações são exibidas abaixo. A prévia é o preço exibido pela SerpApi na primeira etapa da busca de ida e volta para <strong>2 adultos</strong>. Ainda não confirma uma combinação de voos que satisfaça os 17 dias. Valores acima de R$ 8.000 também são registrados. Nenhuma prévia gera alerta.</p>
