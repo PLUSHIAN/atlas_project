@@ -56,11 +56,11 @@ def main(argv=None):
     if not settings.serpapi_key:
         print('SERPAPI_KEY ausente. Defina GitHub Actions Secret SERPAPI_KEY.', file=sys.stderr)
         return 2
-    # Cron principal e contingência compartilham o mesmo slot de 2h.
-    # Execuções manuais mantêm o controle de cadência próprio.
+    # Cron principal, 3 contingências e o disparo inicial por push compartilham
+    # o mesmo slot de 2h. Execuções manuais mantêm a própria cadência.
     if args.destination == 'auto':
         allowed, reason = (should_scan_scheduled()
-                           if os.environ.get('GITHUB_EVENT_NAME') == 'schedule'
+                           if os.environ.get('GITHUB_EVENT_NAME') in ('schedule', 'push')
                            else should_scan())
         if not allowed:
             print(json.dumps({'status':'aguardando_cota','message':reason},ensure_ascii=False))
