@@ -8,10 +8,12 @@ import {Plane,LayoutDashboard,History,Settings2,Sun,Moon,Search,RefreshCw,Mail,
 const money=n=>n===null||n===undefined?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:2}).format(n);
 const when=s=>s?new Date(s).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'Nunca';
 const day=s=>s?new Date(`${s}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}):'—';
-const TITLES={dashboard:'Visão geral',compare:'Comparador',offers:'Oportunidades',history:'Histórico',extras:'Custos adicionais',settings:'Configurações'};
+const TITLES={dashboard:'Visão geral',compare:'Comparador',offers:'Oportunidades',history:'Histórico',google:'Alertas Google',extras:'Custos adicionais',settings:'Configurações'};
 const DEST={FCO:'Roma',MXP:'Milão',BGY:'Milão',LIN:'Milão',BCN:'Barcelona',MAD:'Madri'};
 const STATIC_MODE=import.meta.env.VITE_STATIC_MODE==='true';
 const ACTIONS_URL='https://github.com/PLUSHIAN/atlas_project/actions/workflows/atlas.yml';
+const GOOGLE_FLIGHTS_URL='https://www.google.com/travel/flights?hl=pt-BR';
+const PLUS_DAYS=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
 const destinations=['FCO','MXP','BGY','LIN','BCN','MAD'];
 const origins=['GRU','CGH','VCP','GIG','SDU'];
 function initials(d){return d==='BCN'?'BC':d==='MAD'?'MD':d==='FCO'?'RM':'MI'}
@@ -29,21 +31,21 @@ export default function App(){
  const [formMessage,setFormMessage]=useState('');
  const [compareMode,setCompareMode]=useState('total');
  const [rankings,setRankings]=useState({international_cheapest:[],best_value:[],lowest_known_total:[],without_additional_costs:[],sample_size:0});
- const [marketReference,setMarketReference]=useState([]);const [diagnostics,setDiagnostics]=useState([]);
+ const [marketReference,setMarketReference]=useState([]);const [diagnostics,setDiagnostics]=useState([]);const [coverageInsights,setCoverageInsights]=useState([]);const [showAllTracking,setShowAllTracking]=useState(false);
  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('europa-theme',theme)},[theme]);
  const load=async()=>{try{
-  let o,a,h,c,e,s,rankingData,referenceData,diagnosticData;
+  let o,a,h,c,e,s,rankingData,referenceData,diagnosticData,coverageData;
   if(STATIC_MODE){
    const response=await fetch(`${import.meta.env.BASE_URL}atlas-data.json?t=${Date.now()}`,{cache:'no-store'});
    if(!response.ok) throw new Error('Snapshot não publicado');
    const data=await response.json();
-   ({overview:o,offers:a,history:h,checks:c,extras:e,snapshots:s,rankings:rankingData,market_reference:referenceData,diagnostics:diagnosticData}=data);
+   ({overview:o,offers:a,history:h,checks:c,extras:e,snapshots:s,rankings:rankingData,market_reference:referenceData,diagnostics:diagnosticData,coverage_insights:coverageData}=data);
   }else{
-   const responses=await Promise.all(['/api/overview','/api/offers','/api/history','/api/checks','/api/extras','/api/snapshots','/api/rankings','/api/market-reference','/api/diagnostics'].map(u=>fetch(u)));
+   const responses=await Promise.all(['/api/overview','/api/offers','/api/history','/api/checks','/api/extras','/api/snapshots','/api/rankings','/api/market-reference','/api/diagnostics','/api/coverage-insights'].map(u=>fetch(u)));
    if(responses.some(r=>!r.ok))throw new Error('Servidor indisponível ou resposta inválida');
-   [o,a,h,c,e,s,rankingData,referenceData,diagnosticData]=await Promise.all(responses.map(r=>r.json()));
+   [o,a,h,c,e,s,rankingData,referenceData,diagnosticData,coverageData]=await Promise.all(responses.map(r=>r.json()));
   }
-  setOverview(o);setOffers(a);setHistory(h);setChecks(c);setExtras(e);setSnapshots(s);setRankings(rankingData);setMarketReference(referenceData);setDiagnostics(diagnosticData);setError('');setLoaded(true);
+  setOverview(o);setOffers(a);setHistory(h);setChecks(c);setExtras(e);setSnapshots(s);setRankings(rankingData);setMarketReference(referenceData);setDiagnostics(diagnosticData);setCoverageInsights(coverageData||[]);setError('');setLoaded(true);
  }catch(e){setError(STATIC_MODE?'Snapshot ainda não publicado. Execute o workflow ATLAS no GitHub Actions.':'Não foi possível conectar ao backend. Confira se o FastAPI está rodando na porta 8000.');setLoaded(true)}};
  useEffect(()=>{load();let id=setInterval(load,45000);return()=>clearInterval(id)},[]);
  const scan=async(city=null)=>{if(STATIC_MODE){setScanNotice('No GitHub Pages, use Actions → ATLAS → Run workflow para pesquisar.');window.open(ACTIONS_URL,'_blank','noopener,noreferrer');return;}setBusy(true);setError('');setScanNotice('');try{
@@ -77,8 +79,29 @@ export default function App(){
   return [...unique.values()].sort((a,b)=>a.price_couple-b.price_couple).slice(0,30);
  },[snapshots]);
  const category=o=>o.price_couple<=6000?'great':o.price_couple<=8000?'good':'over';
- const nav=[{key:'dashboard',icon:LayoutDashboard},{key:'compare',icon:ChartNoAxesCombined},{key:'offers',icon:Plane},{key:'history',icon:History},{key:'extras',icon:Navigation},{key:'settings',icon:Settings2}];
+ const nav=[{key:'dashboard',icon:LayoutDashboard},{key:'compare',icon:ChartNoAxesCombined},{key:'offers',icon:Plane},{key:'history',icon:History},{key:'google',icon:Bell},{key:'extras',icon:Navigation},{key:'settings',icon:Settings2}];
  const st=overview?.monitor||{};
+
+ const googleTasks=useMemo(()=>{
+  const cities=['Barcelona','Madri','Roma','Milão'];
+  const groups=[{name:'São Paulo',airports:'GRU, CGH ou VCP'},{name:'Rio de Janeiro',airports:'GIG ou SDU'}];
+  const tasks=[];
+  for(const city of cities)for(const date of ['2027-09-08','2027-09-09','2027-09-10','2027-09-11']){
+    const cover=coverageInsights.find(x=>x.city===city)?.dates?.find(x=>x.departure===date);
+    for(const origin of groups)tasks.push({
+      id:city+'|'+date+'|'+origin.name,city,date,origin:origin.name,airports:origin.airports,
+      back1:PLUS_DAYS(date,15),back2:PLUS_DAYS(date,16),
+      checked:cover?.consulted||0,minIndicative:cover?.min_indicative??null
+    });
+  }
+  return tasks.sort((a,b)=>(a.checked>0)-(b.checked>0)||cities.indexOf(a.city)-cities.indexOf(b.city)||a.date.localeCompare(b.date));
+ },[coverageInsights]);
+ const copyGoogleTask=async(task)=>{
+   const str=task.origin+' ('+task.airports+') → '+task.city+' | 2 adultos, econômica | Ida '+task.date+' | Pesquisar voltas '+task.back1+' e '+task.back2+'; verificar chegada ao Brasil e 17 dias corridos.';
+   try{await navigator.clipboard.writeText(str);setScanNotice('Rota e datas copiadas. Abra o Google Flights e ative "Acompanhar preços" manualmente.');}
+   catch{setScanNotice(str);}
+ };
+
  const topAction=STATIC_MODE?<a className="primary" href={ACTIONS_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={16}/> Executar no GitHub</a>:<button className="primary" onClick={()=>scan()} disabled={busy||st.running||!st.configured}><RefreshCw size={16} className={busy||st.running?'spin':''}/>{busy||st.running?'Pesquisando...':'Pesquisar próxima'}</button>;
  const item=(n)=>{const Icon=n.icon;return <button key={n.key} className={'nav-item '+(view===n.key?'selected':'')} onClick={()=>{setView(n.key);setMobileMenu(false)}}><Icon size={19}/><span>{TITLES[n.key]}</span>{n.key==='offers'&&offers.length>0?<small>{offers.length}</small>:null}</button>};
  return <div className="shell">
@@ -93,7 +116,7 @@ export default function App(){
    <main className="content">
     {error&&<div className="notice error"><AlertTriangle size={18}/><span>{error}</span><button onClick={()=>setError('')}><X size={18}/></button></div>}
     {scanNotice&&<div className="notice info"><Info size={18}/><span>{scanNotice}</span><button onClick={()=>setScanNotice('')}><X size={18}/></button></div>}
-    {STATIC_MODE&&<div className="notice info"><Info size={18}/><span>Modo GitHub Pages: painel de consulta, sem servidor ligado. Workflow agendado a cada 2 horas; para preservar a cota gratuita, pesquisas efetivas podem ocorrer a cada {st.cloud_min_scan_hours||8} horas. Dados históricos, não ofertas garantidas.</span></div>}
+    {STATIC_MODE&&<div className="notice info"><Info size={18}/><span>Modo GitHub Pages: painel de consulta, sem servidor ligado. Workflow agendado a cada 2 horas; para preservar a cota gratuita, as buscas efetivas respeitam o saldo da fonte e o cache. Dados históricos, não ofertas garantidas.</span></div>}
     {view==='dashboard'&&<>
       <section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="sparkle">✦</span> SUA PRÓXIMA AVENTURA</div><h1>O melhor caminho<br/>para a <em>Itália.</em></h1><p>Estamos de olho nas passagens para vocês dois. Compare São Paulo, Rio e quatro portas de entrada na Europa, sem perder o controle do orçamento.</p><div className="hero-chips"><span><CalendarDays size={15}/> Setembro de 2027</span><span><Globe2 size={15}/> 2 passageiros</span><span><Wallet size={15}/> Até R$ 8 mil</span></div></div><div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><span className="big-plane">✈</span><div className="italy-outline">ITALIA</div><div className="art-label">SÃO PAULO / RIO <ArrowRight size={14}/> EUROPA</div></div></section>
       {!STATIC_MODE&&!st.configured&&<div className="notice info"><Info size={18}/><span><strong>Primeiro acesso:</strong> informe a SERPAPI_KEY no <code>.env</code> e reinicie o backend. Nenhuma cotação fictícia é apresentada.</span><button onClick={()=>setView('settings')}>Ver configuração <ArrowRight size={15}/></button></div>}
@@ -101,7 +124,7 @@ export default function App(){
         <div className="stat-card"><div className="stat-top"><span>MENOR IDA + VOLTA VALIDADA</span><div className="stat-icon blue"><Wallet size={18}/></div></div><strong>{money(overview?.best_price)}</strong><div className="stat-foot"><span className="little-dot"/> 2 adultos • 17 dias confirmados</div></div>
         <div className="stat-card"><div className="stat-top"><span>OPORTUNIDADES</span><div className="stat-icon green"><CheckCircle2 size={18}/></div></div><strong>{overview?.opportunities_count??'—'}</strong><div className="stat-foot">Até R$ 8.000 para o casal</div></div>
         <div className="stat-card"><div className="stat-top"><span>CONSULTAS NOS ÚLTIMOS 30 DIAS</span><div className="stat-icon purple"><Database size={18}/></div></div><strong>{st.used_requests_30d??'—'} <span className="stat-denom">/ {st.max_requests_30d??210}</span></strong><div className="progress"><div style={{width:`${Math.min(100,(st.used_requests_30d||0)/(st.max_requests_30d||210)*100)}%`}}/></div><div className="stat-foot">Limite local de segurança</div></div>
-        <div className="stat-card"><div className="stat-top"><span>ÚLTIMA PESQUISA</span><div className="stat-icon amber"><Clock3 size={18}/></div></div><strong className="small-stat">{when(overview?.last_scan_at)}</strong><div className="stat-foot">A cada {st.interval_hours||6}h, com backend ativo</div></div>
+        <div className="stat-card"><div className="stat-top"><span>ÚLTIMA PESQUISA</span><div className="stat-icon amber"><Clock3 size={18}/></div></div><strong className="small-stat">{when(overview?.last_scan_at)}</strong><div className="stat-foot">A cada {st.interval_hours||2}h; no Pages, via GitHub Actions</div></div>
       </div>
 
       <div className="notice info"><Info size={19}/><span><strong>Cobertura real do radar:</strong> {overview?.coverage?.consulted??0} de {overview?.coverage?.total??64} combinações agrupadas consultadas. Ainda faltam {overview?.coverage?.not_yet_consulted??64}. Cada combinação representa um grupo de aeroportos, não todos os aeroportos individualmente. <strong>Menor custo parcial conhecido até a Itália:</strong> {money(overview?.best_total_known)}. Compare as opções em <button className="inline-link" onClick={()=>setView('compare')}>Comparador</button>. Bagagem e outros custos podem faltar.</span></div>
