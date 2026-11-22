@@ -65,6 +65,7 @@ def test_scheduled_trigger_queries_even_after_manual(monkeypatch):
     def blocked_if_called(*args, **kwargs):
         raise AssertionError('should_scan não deve bloquear schedule')
     monkeypatch.setattr(cloud_runner, 'should_scan', blocked_if_called)
+    monkeypatch.setattr(cloud_runner, 'should_scan_scheduled', lambda: (True, 'Slot disponível'))
     calls = []
     def fake_scan(destination=None):
         calls.append(destination)
@@ -82,3 +83,25 @@ def test_manual_auto_still_obeys_cooldown(monkeypatch):
         raise AssertionError('Não deveria consultar dentro da janela manual')
     monkeypatch.setattr(cloud_runner.monitor, 'scan_once', unexpected_scan)
     assert cloud_runner.main([]) == 0
+
+
+def test_fallback_skips_when_slot_already_queried(monkeypatch):
+    now = datetime(2026, 11, 22, 21, 11, tzinfo=timezone.utc)  # 18h11 Brasília
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status':'somente_indicativo','checked_at':datetime(2026,11,22,21,1,tzinfo=timezone.utc).isoformat()}])
+    assert cloud_runner.should_scan_scheduled(now)[0] is False
+
+
+def test_fallback_runs_when_primary_was_missed(monkeypatch):
+    now = datetime(2026, 11, 22, 21, 11, tzinfo=timezone.utc)  # 18h11 Brasília
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status':'cotado','checked_at':datetime(2026,11,22,20,59,tzinfo=timezone.utc).isoformat()}])
+    monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
+    assert cloud_runner.should_scan_scheduled(now)[0] is True
+
+
+def test_scheduled_late_primary_is_not_duplicate(monkeypatch):
+    now = datetime(2026, 11, 22, 22, 5, tzinfo=timezone.utc)  # atraso de 65 minutos
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status':'cotado','checked_at':datetime(2026,11,22,21,12,tzinfo=timezone.utc).isoformat()}])
+    assert cloud_runner.should_scan_scheduled(now)[0] is False
