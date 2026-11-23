@@ -12,11 +12,12 @@ on:
       - 'backend/app/**'
   schedule:
     # GitHub Actions NÃO garante que um horário seja respeitado.
-    # Verificações leves a cada 20 minutos distribuem as tentativas entre
-    # as horas, em vez de concentrar 4 tarefas atrasadas em 15 minutos.
-    # A pesquisa real só ocorre se a última tem >=2h (guard SQLite).
-    # Assim temos até 6 tentativas por janela de 2h, sem usar créditos
-    # da SerpApi nos checks da etapa leve.
+    # Tentativa principal a cada 2h (07h17, 09h17, 11h17... Brasília).
+    # Watchdog leve a cada 20min espalha retries nas duas horas seguintes,
+    # em vez de agrupar todas as tentativas em poucos minutos.
+    # Só executa a busca se a última tem >=2h (guard SQLite).
+    # Checks leves não consomem créditos da SerpApi.
+    - cron: '17 */2 * * *'
     - cron: '13,33,53 * * * *'
   workflow_dispatch:
     inputs:
@@ -136,7 +137,7 @@ jobs:
         run: |
           echo "Evento: ${GITHUB_EVENT_NAME}"
           echo "Branch: ${GITHUB_REF_NAME}"
-          echo "Verificações UTC: cada 20min (13,33,53); pesquisa real >=2h depois da anterior"
+          echo "Agenda UTC: principal 17h a cada 2h / watchdog 13,33,53 a cada hora"
           echo "Disparo: ${{ github.event.schedule || 'push/manual' }}"
 
       - name: Configurar Python
