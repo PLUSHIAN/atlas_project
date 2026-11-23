@@ -27,27 +27,13 @@ def should_scan(now=None, min_hours=None):
     return True, 'Nova rodada elegível'
 
 def should_scan_scheduled(now=None):
-    """Evita duas consultas efetivas no mesmo slot (cron principal + retentativa).
+    """Retentativas e agendamentos seguem 2h REAIS desde a última busca.
 
-    Os horários UTC pares equivalem às horas ímpares de Brasília (19h, 21h...).
-    Consultas manuais ANTERIORES ao slot não bloqueiam a busca agendada.
+    O cron do GitHub pode atrasar mais de 30 minutos. Bloquear por 'hora par'
+    produz falsos positivos e permite consultas a menos de 2h. O histórico
+    SQLite é a fonte única para deduplicar pesquisas e preservar créditos.
     """
-    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    slot_start = now.replace(minute=0, second=0, microsecond=0)
-    if slot_start.hour % 2 == 1:
-        slot_start -= timedelta(hours=1)
-    for item in db.recent_checks(100):
-        if item['status'] not in COMPLETED:
-            continue
-        checked = datetime.fromisoformat(item['checked_at'])
-        if checked.tzinfo is None:
-            checked = checked.replace(tzinfo=timezone.utc)
-        if slot_start <= checked.astimezone(timezone.utc) <= now:
-            return False, 'Esta janela agendada já tem uma pesquisa efetiva; retentativa sem consumo'
-    if db.requests_in_30d() >= settings.max_30d_requests - 1:
-        return False, 'Limite local de segurança de consultas; sem novas pesquisas'
-    return True, 'Janela agendada disponível para busca'
-
+    return should_scan(now=now, min_hours=2)
 
 
 def write_run_report(result, searched):
