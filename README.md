@@ -14,7 +14,7 @@ Depois acesse **Settings > General > Danger Zone > Change repository visibility 
 
 ## GitHub Actions (agendamento e armazenamento)
 
-- `.github/workflows/atlas.yml` é acionado a cada 2 horas (horas ímpares em Brasília: 19h12, 21h12, 23h12 etc., retentativas aos minutos 17, 22 e 27), com tentativa de pesquisa a cada execução (intervalo mínimo de 2h).
+- `.github/workflows/atlas.yml` verifica a elegibilidade a cada 20 minutos (minutos UTC 13, 33 e 53), mas **pesquisa efetivamente apenas quando passam pelo menos 2 horas reais desde a última consulta**. As tentativas são distribuídas ao longo de todo o dia; verificações intermediárias não consomem SerpApi.
 - O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
 - O histórico SQLite é restaurado e salvo como artefato criptografado `atlas-state-encrypted` por até 30 dias. `ATLAS_STATE_KEY` é obrigatório; mantenha uma cópia segura da chave e faça backups periódicos.
 - O React é compilado em modo estático e entregue como artefato `atlas-dashboard`. Quando o repositório for público e Pages estiver ativado, também será publicado como website.
@@ -54,7 +54,7 @@ Nunca envie `.env`, bancos locais, `.venv` ou senhas ao GitHub. A chave publicad
 
 ## Black Friday 2026: cadência reforçada
 
-O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HOURS=1`, priorizando Espanha. Não há mais janela obrigatória de 8 horas. O agendamento GitHub `17 */2 * * *` é em UTC e pode atrasar ou eventualmente falhar; o monitor não garante execução no minuto exato. O robô para de consultar quando a conta não tiver créditos gratuitos ou o teto local for atingido, sem gerar cobranças. Como cada rodada pode consumir duas ou três consultas, 12 rodadas diárias podem consumir até aproximadamente 24 a 36 créditos/dia.
+O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HOURS=1`, priorizando Espanha. Não há mais janela obrigatória de 8 horas. O agendamento GitHub `13,33,53 * * * *` é em UTC e pode atrasar ou eventualmente falhar; o monitor não garante execução no minuto exato. O robô para de consultar quando a conta não tiver créditos gratuitos ou o teto local for atingido, sem gerar cobranças. Como cada rodada pode consumir duas ou três consultas, 12 rodadas diárias podem consumir até aproximadamente 24 a 36 créditos/dia.
 
 
 ## Google Flights: alertas gratuitos oficiais
@@ -71,7 +71,8 @@ Os e-mails **do ATLAS** continuam independentes e são disparados por cotações
 ## Execuções automáticas e contingências (novembro 2026)
 
 - A primeira implantação deste agendamento executa automaticamente pelo evento `push` quando `.github/workflows/atlas.yml` é atualizado na `main`. O evento é **push**, não **schedule**; para validar a agenda espere aparecer uma execução `Scheduled`.
-- O cron principal roda às 19h12, 21h12, 23h12, 01h12 etc. (horário de Brasília) e existem **três tentativas extras** aos minutos 17, 22 e 27 de cada janela, todas gratuitas no GitHub Actions para repositórios públicos conforme as condições do serviço.
+- A verificação leve acontece a cada 20 minutos, incluindo **até seis tentativas ao longo de duas horas**. O job caro (restauração do SQLite, testes, chamadas SerpApi e publicação do Pages) é ignorado se o snapshot público comprovar que a última consulta foi há menos de 2h. Se o snapshot estiver indisponível, a verificação definitiva é feita pelo SQLite criptografado.
+- A janela agora é **deslizante**: se o GitHub executar uma busca às 23h44, a próxima só será elegível a partir de 01h44, mesmo que o cron já tenha tentado 01h13 ou 01h33. Essa correção evita pesquisar cedo demais ou bloquear janelas indevidamente. GitHub pode atrasar todas as tentativas; não há garantia de execução pontual.
 - O histórico SQLite impede repetir uma pesquisa **concluída** no mesmo ciclo. Os retries só consultam a fonte se não houver consulta efetiva gravada no ciclo; o custo em créditos SerpApi pode aumentar se as buscas falharem repetidamente.
 - GitHub Actions pode atrasar ou descartar **todas** as tentativas; não existe SLA ou garantia de início pontual. Para identificar a origem no log, procure `Evento: push` (automático por commit), `Evento: schedule` (automático por cron) ou `Evento: workflow_dispatch` (manual).
 - Para verificar: https://github.com/PLUSHIAN/atlas_project/actions/workflows/atlas.yml . Pesquisas e e-mails dependem dos Secrets e da cota disponível.
