@@ -13,6 +13,7 @@ on:
   schedule:
     # GitHub Actions NÃO garante que um horário seja respeitado.
     # Tentativa principal a cada 2h (07h17, 09h17, 11h17... Brasília).
+    # O modo 'source: external' permite cron-job.org fazer o disparo de backup.
     # Watchdog leve a cada 20min espalha retries nas duas horas seguintes,
     # em vez de agrupar todas as tentativas em poucos minutos.
     # Só executa a busca se a última tem >=2h (guard SQLite).
@@ -21,6 +22,14 @@ on:
     - cron: '13,33,53 * * * *'
   workflow_dispatch:
     inputs:
+      source:
+        description: 'Origem do disparo (manual ou agendador externo)'
+        type: choice
+        required: false
+        default: manual
+        options:
+          - manual
+          - external
       destination:
         description: 'Destino desta execução (auto respeita o intervalo de economia)'
         required: false
@@ -56,6 +65,7 @@ jobs:
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          TRIGGER_SOURCE: ${{ github.event.inputs.source || 'manual' }}
         run: |
           python - <<'PY'
           import json
@@ -66,7 +76,9 @@ jobs:
           # Disparos manuais e por alteração do código continuam disponíveis.
           eligible = True
           message = 'Disparo manual ou por alteração do código'
-          if os.environ.get('EVENT_NAME') == 'schedule':
+          external_dispatch = (os.environ.get('EVENT_NAME') == 'workflow_dispatch'
+                               and os.environ.get('TRIGGER_SOURCE') == 'external')
+          if os.environ.get('EVENT_NAME') == 'schedule' or external_dispatch:
               try:
                   url = 'https://plushian.github.io/atlas_project/atlas-data.json?run=' + os.environ.get('GITHUB_RUN_ID', '')
                   with urlopen(url, timeout=8) as response:
