@@ -14,7 +14,7 @@ Depois acesse **Settings > General > Danger Zone > Change repository visibility 
 
 ## GitHub Actions (agendamento e armazenamento)
 
-- `.github/workflows/atlas.yml` verifica a elegibilidade a cada 20 minutos (minutos UTC 13, 33 e 53), mas **pesquisa efetivamente apenas quando passam pelo menos 2 horas reais desde a última consulta**. As tentativas são distribuídas ao longo de todo o dia; verificações intermediárias não consomem SerpApi.
+- `.github/workflows/atlas.yml` mantém o disparo principal **a cada 2 horas**, no minuto 17 UTC (07h17, 09h17, 11h17... em Brasília). Também verifica a elegibilidade a cada 20 minutos (minutos UTC 13, 33 e 53) para recuperar atrasos; **pesquisa efetivamente apenas quando passam pelo menos 2 horas reais desde a última consulta**. As verificações intermediárias não consomem SerpApi.
 - O GitHub executa o backend pontualmente, **não hospeda FastAPI permanentemente**.
 - O histórico SQLite é restaurado e salvo como artefato criptografado `atlas-state-encrypted` por até 30 dias. `ATLAS_STATE_KEY` é obrigatório; mantenha uma cópia segura da chave e faça backups periódicos.
 - O React é compilado em modo estático e entregue como artefato `atlas-dashboard`. Quando o repositório for público e Pages estiver ativado, também será publicado como website.
@@ -54,7 +54,7 @@ Nunca envie `.env`, bancos locais, `.venv` ou senhas ao GitHub. A chave publicad
 
 ## Black Friday 2026: cadência reforçada
 
-O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HOURS=1`, priorizando Espanha. Não há mais janela obrigatória de 8 horas. O agendamento GitHub `13,33,53 * * * *` é em UTC e pode atrasar ou eventualmente falhar; o monitor não garante execução no minuto exato. O robô para de consultar quando a conta não tiver créditos gratuitos ou o teto local for atingido, sem gerar cobranças. Como cada rodada pode consumir duas ou três consultas, 12 rodadas diárias podem consumir até aproximadamente 24 a 36 créditos/dia.
+O workflow roda com `CLOUD_MIN_SCAN_HOURS=2`, `MAX_REQUESTS_30D=250` e `CACHE_HOURS=1`, priorizando Espanha. Não há mais janela obrigatória de 8 horas. Os agendamentos GitHub `17 */2 * * *` e `13,33,53 * * * *` são em UTC e pode atrasar ou eventualmente falhar; o monitor não garante execução no minuto exato. O robô para de consultar quando a conta não tiver créditos gratuitos ou o teto local for atingido, sem gerar cobranças. Como cada rodada pode consumir duas ou três consultas, 12 rodadas diárias podem consumir até aproximadamente 24 a 36 créditos/dia.
 
 
 ## Google Flights: alertas gratuitos oficiais
