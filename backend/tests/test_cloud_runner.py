@@ -58,8 +58,8 @@ def test_can_use_up_to_250_credits_but_wont_exceed(monkeypatch):
     assert not cloud_runner.should_scan(now)[0]
 
 
-def test_scheduled_trigger_queries_even_after_manual(monkeypatch):
-    """A execução schedule não deve pular a busca só por consulta manual recente."""
+def test_scheduled_trigger_uses_same_real_interval_guard(monkeypatch):
+    """Execuções schedule respeitam a janela real de duas horas."""
     monkeypatch.setenv('GITHUB_EVENT_NAME', 'schedule')
     monkeypatch.setattr(cloud_runner.settings, 'serpapi_key', 'chave-falsa-do-teste')
     def blocked_if_called(*args, **kwargs):
@@ -85,17 +85,17 @@ def test_manual_auto_still_obeys_cooldown(monkeypatch):
     assert cloud_runner.main([]) == 0
 
 
-def test_fallback_skips_when_slot_already_queried(monkeypatch):
+def test_fallback_skips_when_real_search_is_recent(monkeypatch):
     now = datetime(2026, 11, 22, 22, 17, tzinfo=timezone.utc)  # 19h17 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status':'somente_indicativo','checked_at':datetime(2026,11,22,22,1,tzinfo=timezone.utc).isoformat()}])
     assert cloud_runner.should_scan_scheduled(now)[0] is False
 
 
-def test_fallback_runs_when_primary_was_missed(monkeypatch):
+def test_fallback_runs_when_last_search_is_more_than_two_hours_old(monkeypatch):
     now = datetime(2026, 11, 22, 22, 17, tzinfo=timezone.utc)  # 19h17 Brasília
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
-        {'status':'cotado','checked_at':datetime(2026,11,22,20,59,tzinfo=timezone.utc).isoformat()}])
+        {'status':'cotado','checked_at':datetime(2026,11,22,20,5,tzinfo=timezone.utc).isoformat()}])
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
     assert cloud_runner.should_scan_scheduled(now)[0] is True
 
@@ -138,12 +138,12 @@ def test_push_initial_run_skips_if_same_slot_was_queried(monkeypatch):
     assert cloud_runner.main([]) == 0
 
 
-def test_cron_at_1917_does_not_confuse_manual_at_1859(monkeypatch):
-    """Regressão: cron 19h17 BRT = 22h17 UTC, com slot começando 22h UTC."""
+def test_late_cron_runs_when_last_search_over_2h_ago(monkeypatch):
+    """O cálculo usa o intervalo real entre cotações, não a paridade UTC."""
     now = datetime(2026, 11, 22, 22, 17, tzinfo=timezone.utc)
     monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
         {'status': 'somente_indicativo',
-         'checked_at': datetime(2026, 11, 22, 21, 59, tzinfo=timezone.utc).isoformat()}])
+         'checked_at': datetime(2026, 11, 22, 20, 1, tzinfo=timezone.utc).isoformat()}])
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 8)
     assert cloud_runner.should_scan_scheduled(now)[0] is True
 
@@ -173,8 +173,8 @@ def test_report_distinguishes_run_and_search(monkeypatch, tmp_path):
     assert data['destination'] == 'Madri'
 
 
-def test_19h12_bootstrap_and_three_retry_slots(monkeypatch):
-    """A trava vale por uma janela de 2h, não pelos minutos do cron."""
+def test_retry_guard_respects_real_2h_from_last_completed_scan(monkeypatch):
+    """O relógio vale por 2h desde a última cotação, inclusive entre horas pares."""
     monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 20)
     first = datetime(2026, 11, 22, 22, 9, tzinfo=timezone.utc)  # início via push
     for minute in (12, 17, 22, 27):
@@ -184,3 +184,32 @@ def test_19h12_bootstrap_and_three_retry_slots(monkeypatch):
         assert cloud_runner.should_scan_scheduled(now)[0] is False
     next_cycle = datetime(2026, 11, 23, 0, 12, tzinfo=timezone.utc)  # 21h12 BRT
     assert cloud_runner.should_scan_scheduled(next_cycle)[0] is True
+
+
+def test_delayed_2344_search_blocks_0112_but_allows_0211(monkeypatch):
+    """Regressão real: GitHub atrasou a pesquisa 23h44 e os próximos slots."""
+    last = datetime(2026, 11, 23, 2, 44, tzinfo=timezone.utc)  # 23h44 Brasília
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status':'cotado', 'checked_at':last.isoformat()}])
+    monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 24)
+    assert cloud_runner.should_scan_scheduled(datetime(
+        2026, 11, 23, 4, 12, tzinfo=timezone.utc))[0] is False  # 01h12
+    assert cloud_runner.should_scan_scheduled(datetime(
+        2026, 11, 23, 5, 11, tzinfo=timezone.utc))[0] is True  # 02h11
+
+
+def test_scheduled_retry_does_not_reset_cooldown(monkeypatch):
+    now = datetime(2026, 11, 23, 5, 11, tzinfo=timezone.utc)
+    check = {'status':'aguardando_cota', 'checked_at':now.isoformat()}
+    older = {'status':'cotado', 'checked_at':datetime(
+        2026, 11, 23, 2, 44, tzinfo=timezone.utc).isoformat()}
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [check, older])
+    monkeypatch.setattr(cloud_runner.db, 'requests_in_30d', lambda: 22)
+    assert cloud_runner.should_scan_scheduled(now)[0] is True
+
+
+def test_recent_manual_result_counts_toward_2h_cooldown(monkeypatch):
+    now = datetime(2026, 11, 23, 5, 11, tzinfo=timezone.utc)
+    monkeypatch.setattr(cloud_runner.db, 'recent_checks', lambda n: [
+        {'status':'somente_indicativo','checked_at':(now-timedelta(minutes=45)).isoformat()}])
+    assert cloud_runner.should_scan_scheduled(now)[0] is False
